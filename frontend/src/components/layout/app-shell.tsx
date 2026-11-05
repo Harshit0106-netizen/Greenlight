@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { site } from "@/config/site";
 import { ToastProvider } from "@/components/ui";
 import { useTheme } from "@/lib/theme";
+import { useHydrated } from "@/lib/hooks";
+import { useSession } from "@/lib/session";
+import { reloadReviews, useReviewsError } from "@/features/reviews/lib/store";
 import { CommandPalette } from "./command-palette";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -11,6 +15,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   useTheme(); // keeps <html data-theme> in sync with the stored preference
+  const router = useRouter();
+  const hydrated = useHydrated();
+  const user = useSession();
+  const loadError = useReviewsError();
+  useEffect(() => { if (hydrated && !user) router.replace("/login"); }, [hydrated, user, router]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -19,6 +28,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  if (!hydrated || !user) return <div className="min-h-screen bg-page" aria-busy="true" />;
 
   return (
     <ToastProvider>
@@ -32,9 +43,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         <div className="lg:pl-[256px]">
           <Topbar onMenu={() => setMobileOpen(true)} onSearch={() => setPaletteOpen(true)} />
-          <main className="mx-auto min-h-[calc(100vh-130px)] max-w-[1480px] px-4 py-7 md:px-8 md:py-9">{children}</main>
+          <main className="mx-auto min-h-[calc(100vh-130px)] max-w-[1480px] px-4 py-7 md:px-8 md:py-9">
+            {loadError && (
+              <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/25 bg-danger/10 p-3.5 text-sm text-danger">
+                <span>{loadError}</span>
+                <button onClick={reloadReviews} className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-bold hover:bg-danger/10">Try again</button>
+              </div>
+            )}
+            {children}
+          </main>
           <footer className="border-t border-line px-6 py-5 text-center text-[11px] text-muted">
-            {site.name.toUpperCase()} · {site.tagline} · Demo workspace
+            {site.name.toUpperCase()} · {site.tagline} · {process.env.NEXT_PUBLIC_USE_MOCK === "false" ? "Live workspace" : "Demo workspace · mock data"}
           </footer>
         </div>
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

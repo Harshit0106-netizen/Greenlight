@@ -1,25 +1,29 @@
 "use client";
 import { useState } from "react";
-import { Check, CheckCheck, Copy, Pencil, RotateCcw, ShieldQuestion, ThumbsDown } from "lucide-react";
+import { Check, CheckCheck, Copy, Pencil, ShieldQuestion, ThumbsDown } from "lucide-react";
 import { Button, Card, CardHeader, StatusBadge, Textarea, useToast } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import type { Finding, FindingStatus, AnalysisSource } from "../types";
+import type { Finding, FindingStatus } from "../types";
 
 type Props = {
   finding?: Finding;
-  source: AnalysisSource;
   canApply: boolean;
-  onDecide: (status: FindingStatus) => void;
+  /** Only the creator of the review can resolve findings; others read the evidence. */
+  canResolve: boolean;
+  busy?: boolean;
+  onDecide: (status: Extract<FindingStatus, "Accepted" | "Disputed">, reason?: string) => void;
   onApply: () => void;
   onRewrite: (text: string) => void;
 };
 
 const Label = ({ children }: { children: string }) => <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{children}</div>;
 
-export function FindingEvidence({ finding, source, canApply, onDecide, onApply, onRewrite }: Props) {
+export function FindingEvidence({ finding, canApply, canResolve, busy, onDecide, onApply, onRewrite }: Props) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
+  const [disputing, setDisputing] = useState(false);
+  const [reason, setReason] = useState("");
 
   if (!finding) {
     return (
@@ -41,15 +45,16 @@ export function FindingEvidence({ finding, source, canApply, onDecide, onApply, 
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge dot={false}>{f.severity}</StatusBadge>
           <span className="text-sm font-semibold text-ink">{f.category}</span>
-          <span className="ml-auto text-xs text-muted">
-            {source === "local-demo" ? "Deterministic rule check" : "Backend finding"}
-          </span>
+          <span className="ml-auto text-xs text-muted">{f.method === "ai_assisted" ? "AI-assisted · verified against your text" : "Rule-based check"} · {f.confidence}% confidence</span>
         </div>
 
         <div className={cn("rounded-xl border-l-4 p-4", f.status === "Edited" ? "border-success bg-success/10" : "border-danger bg-danger/10")}>
-          <Label>{f.status === "Edited" ? "Original wording" : "Matched content"}</Label>
-          <p className={cn("mt-1.5 text-[15px] leading-6 text-ink", f.status === "Edited" && "line-through decoration-danger/50")}>“{f.quote}”</p>
-          {f.status === "Edited" && f.resolvedText && <p className="mt-2 text-[15px] leading-6 text-success">Now reads: “{f.resolvedText}”</p>}
+          {f.status === "Edited" ? (
+            <>
+              {f.originalQuote && (<><Label>Original wording</Label><p className="mt-1.5 text-[15px] leading-6 text-ink line-through decoration-danger/50">“{f.originalQuote}”</p></>)}
+              <p className={cn("text-[15px] leading-6 text-success", f.originalQuote && "mt-2")}>Now reads: “{f.resolvedText ?? f.quote}”</p>
+            </>
+          ) : (<><Label>Matched content</Label><p className="mt-1.5 text-[15px] leading-6 text-ink">“{f.quote}”</p></>)}
         </div>
 
         <div><Label>Why this was flagged</Label><p className="mt-2 text-sm leading-6 text-ink/80">{f.reason}</p></div>
@@ -60,36 +65,56 @@ export function FindingEvidence({ finding, source, canApply, onDecide, onApply, 
           <p className="mt-2 text-sm leading-6 text-ink/90">{f.receipt}</p>
         </div>
 
+        {f.decisionReason && f.status !== "Open" && (
+          <div><Label>Decision note</Label><p className="mt-2 text-sm leading-6 text-ink/80">{f.decisionReason}</p></div>
+        )}
+
         <div>
-          <Label>{replaceable ? "Suggested correction · reviewer discretion" : "Suggested action · for a human to complete"}</Label>
+          <Label>{replaceable ? "Suggested correction · optional" : "Suggested action · for a human to complete"}</Label>
           {editing ? (
             <div className="mt-2 space-y-2">
-              <p className="text-xs leading-5 text-muted">Replace only the highlighted phrase in the submitted draft. This does not mark the finding as not applicable or approve the review.</p>
+              <p className="text-xs leading-5 text-muted">Replace only the highlighted phrase in the draft. This does not approve the review.</p>
               <Textarea rows={3} value={text} onChange={e => setText(e.target.value)} autoFocus aria-label="Replacement wording for highlighted phrase" />
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => { if (text.trim() && text.trim() !== f.quote) { onRewrite(text.trim()); setEditing(false); } }} disabled={!text.trim() || text.trim() === f.quote || !canApply}><Check size={13} /> Save replacement to draft</Button>
+                <Button size="sm" loading={busy} onClick={() => { if (text.trim() && text.trim() !== f.quote) { onRewrite(text.trim()); setEditing(false); } }} disabled={!text.trim() || text.trim() === f.quote || !canApply}><Check size={13} /> Save replacement to draft</Button>
                 <Button size="sm" variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
               </div>
             </div>
           ) : (
             <>
               <div className="mt-2 rounded-xl border border-success/25 bg-success/10 p-3 text-sm leading-6 text-ink">{f.suggestion}</div>
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {replaceable && <Button size="sm" onClick={onApply} disabled={!canApply || f.status === "Edited"}><Check size={13} /> Apply suggested replacement</Button>}
-                <Button size="sm" variant="secondary" onClick={() => { setText(f.quote); setEditing(true); }} disabled={!canApply}><Pencil size={13} /> Write replacement</Button>
-              </div>
-              {!canApply && f.status !== "Edited" && <p className="mt-2 text-xs text-warning">The flagged phrase is no longer present in the draft. Re-run analysis or review the updated copy.</p>}
+              {canResolve && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {replaceable && <Button size="sm" loading={busy} onClick={onApply} disabled={!canApply || f.status === "Edited"}><Check size={13} /> Apply suggested replacement</Button>}
+                  <Button size="sm" variant="secondary" onClick={() => { setText(f.quote); setEditing(true); }} disabled={!canApply || busy}><Pencil size={13} /> Write replacement</Button>
+                </div>
+              )}
+              {!canApply && f.status !== "Edited" && <p className="mt-2 text-xs text-warning">The flagged phrase is no longer present in the draft. Reload the review.</p>}
             </>
           )}
         </div>
 
         <div className="border-t border-line pt-4">
           <Label>Human decision · classify this finding</Label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => onDecide("Accepted")} disabled={f.status === "Accepted"}><CheckCheck size={13} /> Confirm this is a valid issue</Button>
-            <Button size="sm" variant="secondary" onClick={() => onDecide("Disputed")} disabled={f.status === "Disputed"}><ThumbsDown size={13} /> Mark as not applicable</Button>
-            {f.status !== "Open" && <Button size="sm" variant="ghost" onClick={() => onDecide("Open")}><RotateCcw size={13} /> Reopen</Button>}
-          </div>
+          {canResolve ? (
+            disputing ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs leading-5 text-muted">Say why this does not apply. The reason is recorded and shown to the reviewer.</p>
+                <Textarea rows={2} value={reason} onChange={e => setReason(e.target.value)} autoFocus aria-label="Reason this finding does not apply" />
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" loading={busy} disabled={!reason.trim()} onClick={() => { onDecide("Disputed", reason.trim()); setDisputing(false); setReason(""); }}><ThumbsDown size={13} /> Mark as not applicable</Button>
+                  <Button size="sm" variant="secondary" onClick={() => { setDisputing(false); setReason(""); }}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" disabled={busy || f.status === "Accepted"} onClick={() => onDecide("Accepted")}><CheckCheck size={13} /> Confirm this is a valid issue</Button>
+                <Button size="sm" variant="secondary" disabled={busy || f.status === "Disputed"} onClick={() => setDisputing(true)}><ThumbsDown size={13} /> Mark as not applicable</Button>
+              </div>
+            )
+          ) : (
+            <p className="mt-2 text-xs leading-5 text-muted">Only the creator of this review can confirm, edit or dispute findings. You can read the evidence and decision here.</p>
+          )}
         </div>
       </div>
     </Card>

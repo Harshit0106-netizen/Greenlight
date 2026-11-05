@@ -1,13 +1,9 @@
-import { BookOpen, ChevronRight, Palette, Trash2, UploadCloud } from "lucide-react";
+import { BookOpen, ChevronRight, Palette, UploadCloud } from "lucide-react";
 import { Badge, Button, StatusBadge, useToast } from "@/components/ui";
 import { brandPalette } from "../data";
 import type { ApprovedFact, BrandRule, BrandTerm } from "../types";
 
-const RemoveButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
-  <button onClick={onClick} aria-label={label} className="rounded-lg p-2 text-muted transition hover:bg-danger/10 hover:text-danger"><Trash2 size={14} /></button>
-);
-
-export function RuleCard({ rule, onRemove }: { rule: BrandRule; onRemove: () => void }) {
+export function RuleCard({ rule }: { rule: BrandRule }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-line p-4 transition hover:border-brand/30 hover:bg-brand/[.03] sm:flex-row sm:items-start">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand"><BookOpen size={16} /></span>
@@ -16,27 +12,27 @@ export function RuleCard({ rule, onRemove }: { rule: BrandRule; onRemove: () => 
         <p className="mt-1.5 text-sm leading-6 text-muted">{rule.description}</p>
         <div className="mt-2 text-xs text-muted/80">{rule.source} · {rule.id}</div>
       </div>
-      <div className="flex items-center gap-1 self-start"><Badge>{rule.category}</Badge><RemoveButton label={`Delete ${rule.title}`} onClick={onRemove} /></div>
+      <div className="flex items-center gap-1 self-start"><Badge>{rule.category}</Badge></div>
     </div>
   );
 }
 
-export function FactCard({ fact, onRemove }: { fact: ApprovedFact; onRemove: () => void }) {
+export function FactCard({ fact }: { fact: ApprovedFact }) {
   return (
     <div className="rounded-xl border border-line p-4 transition hover:border-success/40">
       <div className="flex items-start justify-between gap-2"><div className="text-sm font-semibold text-ink">{fact.subject}</div><StatusBadge>Approved</StatusBadge></div>
       <p className="mt-3 text-sm leading-6 text-ink/80">{fact.approvedText}</p>
-      <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-muted"><span>{fact.source} · {fact.id}</span><RemoveButton label={`Delete ${fact.subject}`} onClick={onRemove} /></div>
+      <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-muted"><span>{fact.source} · {fact.id}</span></div>
     </div>
   );
 }
 
-export function TermRow({ term, onRemove }: { term: BrandTerm; onRemove: () => void }) {
+export function TermRow({ term }: { term: BrandTerm }) {
   return (
     <div className="grid grid-cols-[1fr_28px_1fr] items-center gap-3 rounded-xl border border-line p-3">
       <div><div className="text-sm font-semibold text-danger line-through decoration-danger/40">{term.avoid}</div><div className="mt-1 text-xs text-muted">{term.note}</div></div>
       <ChevronRight size={16} className="text-muted" />
-      <div className="flex items-center justify-between gap-2"><div className="text-sm font-bold text-success">{term.use}</div><RemoveButton label={`Delete rule for ${term.avoid}`} onClick={onRemove} /></div>
+      <div className="flex items-center justify-between gap-2"><div className="text-sm font-bold text-success">{term.use}</div></div>
     </div>
   );
 }

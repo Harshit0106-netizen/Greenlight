@@ -1,4 +1,4 @@
-export type RuleCategory = "Tone" | "Terminology" | "Claims" | "Accessibility" | "Visual";
+export type RuleCategory = "Guideline" | "Tone" | "Terminology" | "Claims" | "Accessibility" | "Visual";
 
 export interface BrandRule {
   id: string;

@@ -4,14 +4,24 @@ import { Activity, AlertTriangle, ArrowUpRight, BarChart3, Lightbulb, ShieldChec
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge, Card, CardHeader, PageHeader, StatCard, StatusBadge } from "@/components/ui";
 import { chart } from "@/components/ui/chart-theme";
+import { categoryLabel } from "@/features/reviews/lib/adapters";
 import { useReviews } from "@/features/reviews/lib/store";
-import { patterns, trend } from "./data";
+import { api } from "@/lib/api";
+import { can, useSession } from "@/lib/session";
+import { useAsync } from "@/lib/use-api";
+import { trend } from "./data";
 
 const barColors = [chart.brand, chart.info, chart.warning, chart.success];
 const tick = { fill: chart.muted, fontSize: 11 };
 
 export function InsightsView() {
   const reviews = useReviews();
+  const role = useSession()?.role;
+  const summary = useAsync(() => api.getInsightsSummary()).data;
+  const gapsState = useAsync(() => api.getInsightGaps(), can.seeGaps(role));
+  const gaps = gapsState.data ?? [];
+  const patterns = (summary?.top_issues ?? []).map(t => ({ name: categoryLabel[t.type] ?? t.type, count: t.count }));
+  const totalFindings = patterns.reduce((n, p) => n + p.count, 0);
   const live = { High: 0, Medium: 0, Low: 0 };
   reviews.forEach(r => r.findings.forEach(f => { if (f.status === "Open") live[f.severity]++; }));
   const liveTotal = live.High + live.Medium + live.Low;
@@ -20,15 +30,15 @@ export function InsightsView() {
     <div>
       <PageHeader eyebrow="Continuous improvement · Brand intelligence" title="Insights" description="Understand recurring content issues and see where brand guidance needs attention." />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Activity} label="Total findings" value={42} hint="Last 30 days · sample" />
+        <StatCard icon={Activity} label="Findings so far" value={summary ? totalFindings : "—"} hint="Across reviews you can see · live" />
         <StatCard icon={Target} tone="success" label="Resolution rate" value="86%" trend="+6%" hint="vs. previous period" />
-        <StatCard icon={Lightbulb} tone="warning" label="Guideline gaps" value="03" hint="Potentially unclear rules" />
+        <StatCard icon={Lightbulb} tone="warning" label="Guideline gaps" value={can.seeGaps(role) ? String(gaps.length).padStart(2, "0") : "—"} hint={can.seeGaps(role) ? "Rules creators keep disputing · live" : "Visible to brand admins"} />
         <StatCard icon={ShieldCheck} tone="info" label="Brand health" value="86" trend="+4 pts" hint="This month" />
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1.3fr_1fr]">
         <Card>
-          <CardHeader icon={BarChart3} title="Most common findings" description="Where content most often diverges from brand standards" action={<Badge>Sample · 30 days</Badge>} />
+          <CardHeader icon={BarChart3} title="Most common findings" description="Where content most often diverges from brand standards" action={<Badge tone="brand" dot>Live</Badge>} />
           <div className="h-72 p-5" role="img" aria-label="Bar chart of the most common finding categories">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={patterns} layout="vertical" margin={{ left: 12, right: 12 }}>
@@ -36,7 +46,7 @@ export function InsightsView() {
                 <XAxis type="number" tick={tick} tickLine={false} axisLine={false} />
                 <YAxis type="category" dataKey="name" width={150} tick={{ ...tick, fontSize: 12 }} tickLine={false} axisLine={false} />
                 <Tooltip {...chart.tooltip} cursor={{ fill: "rgb(var(--soft))" }} />
-                <Bar dataKey="count" name="Flags" radius={[0, 8, 8, 0]} barSize={22}>{patterns.map((_, i) => <Cell key={i} fill={barColors[i]} />)}</Bar>
+                <Bar dataKey="count" name="Findings" radius={[0, 8, 8, 0]} barSize={22}>{patterns.map((_, i) => <Cell key={i} fill={barColors[i % barColors.length]} />)}</Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -73,16 +83,21 @@ export function InsightsView() {
         <Card className="p-5">
           <div className="flex items-center gap-2"><Lightbulb size={17} className="text-warning" /><h2 className="text-sm font-semibold text-ink">Guideline Gap Radar</h2></div>
           <p className="mt-2 text-sm leading-6 text-muted">Repeated disputes can signal unclear guidance, not just creator mistakes.</p>
-          <div className="mt-4 rounded-xl border border-warning/25 bg-warning/10 p-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-warning"><AlertTriangle size={14} /> Visual identity guide · Colour usage</div>
-            <p className="mt-2 text-sm leading-6 text-ink/80">This rule has been disputed repeatedly. Consider clarifying approved use cases and exceptions.</p>
-            <div className="mt-3"><StatusBadge>Needs clarification</StatusBadge></div>
-          </div>
+          {!can.seeGaps(role) && <p className="mt-4 rounded-xl bg-soft p-4 text-sm text-muted">Guideline gaps are visible to brand admins.</p>}
+          {can.seeGaps(role) && gapsState.loading && <p className="mt-4 text-sm text-muted">Loading…</p>}
+          {can.seeGaps(role) && !gapsState.loading && !gaps.length && <p className="mt-4 rounded-xl bg-success/10 p-4 text-sm text-ink/80">No guideline is being disputed repeatedly right now.</p>}
+          {gaps.map(g => (
+            <div key={g.source_id} className="mt-4 rounded-xl border border-warning/25 bg-warning/10 p-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-warning"><AlertTriangle size={14} /> {g.title} · {g.source_id}</div>
+              <p className="mt-2 text-sm leading-6 text-ink/80">{g.note}</p>
+              <div className="mt-3"><StatusBadge>Needs clarification</StatusBadge></div>
+            </div>
+          ))}
           <Link href="/brand-kit" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-brand hover:text-brand-strong">Review guideline gaps <ArrowUpRight size={12} /></Link>
         </Card>
         <Card className="p-5">
           <div className="flex items-center gap-2"><TrendingUp size={16} className="text-success" /><h2 className="text-sm font-semibold text-ink">Improvement opportunity</h2></div>
-          <p className="mt-2 text-sm leading-6 text-muted">Unsupported superlatives account for the largest share of current findings.</p>
+          <p className="mt-2 text-sm leading-6 text-muted">{patterns[0] ? `“${patterns[0].name}” is the most common finding type right now.` : "Findings will appear here once reviews are submitted."}</p>
           <div className="mt-4 rounded-xl bg-success/10 p-4 text-sm leading-6 text-ink/80">Add approved evidence for comparative claims, or clarify which superlatives are prohibited.</div>
         </Card>
       </div>

@@ -5,6 +5,7 @@ import type {
   PatchFindingResponse, ReviewDetail, ReviewListItem, SourceKind, WorkflowNoteRequest,
   WorkflowResponse,
 } from "@/types/contract";
+import { ApiError } from "./api-error";
 import { mockRequest } from "./mockData";
 
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -13,14 +14,14 @@ const TOKEN_KEY = "greenlight-access-token";
 /** NEXT_PUBLIC_USE_MOCK=true (default) serves contract-shaped fake data; false talks to the live backend. */
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
 
-export class ApiError extends Error {
-  /** Contract error code, e.g. "forbidden". */
-  get code(): string | undefined { return (this.body as { error?: { code?: string } } | undefined)?.error?.code; }
-  constructor(message: string, public readonly status: number, public readonly body?: unknown) {
-    super(message);
-    this.name = "ApiError";
-  }
+let unauthorizedHandler: (() => void) | null = null;
+/** The session module registers this so an expired token sends the user back to /login. */
+export function setUnauthorizedHandler(fn: (() => void) | null): void { unauthorizedHandler = fn; }
+export function getAccessToken(): string | null {
+  return typeof window !== "undefined" ? window.sessionStorage.getItem(TOKEN_KEY) : null;
 }
+
+export { ApiError };
 
 function apiBaseUrl(): string {
   const value = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -40,7 +41,13 @@ export function hasAccessToken(): boolean {
 }
 
 async function request<T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> {
-  if (USE_MOCK) return mockRequest<T>(path, init);
+  if (USE_MOCK) {
+    try { return await mockRequest<T>(path, init, getAccessToken()); }
+    catch (error) {
+      if (error instanceof ApiError && error.status === 401 && authenticated) { clearAccessToken(); unauthorizedHandler?.(); }
+      throw error;
+    }
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
   const token = typeof window !== "undefined" ? window.sessionStorage.getItem(TOKEN_KEY) : null;
@@ -66,6 +73,7 @@ async function request<T>(path: string, init: RequestInit = {}, authenticated = 
       // Contract error shape: { "error": { "code": "...", "message": "..." } }
       const err = (payload as { error?: { message?: unknown } } | null)?.error;
       const detail = typeof err?.message === "string" ? err.message : `Request failed (${response.status}).`;
+      if (response.status === 401 && authenticated) { clearAccessToken(); unauthorizedHandler?.(); }
       throw new ApiError(detail, response.status, payload);
     }
     return payload as T;

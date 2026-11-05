@@ -25,6 +25,12 @@ export interface Finding {
   ruleId?: string;
   /** The wording now in the copy once a finding has been edited (used to highlight the fix). */
   resolvedText?: string;
+  /** The wording that was flagged before an edit, when this browser saw it (the API only keeps the current span). */
+  originalQuote?: string;
+  /** How the finding was produced. Shown as a badge, never hidden. */
+  method?: "rule_based" | "ai_assisted";
+  /** The reason the creator gave when deciding (required for "not applicable"). */
+  decisionReason?: string;
 }
 
 export interface AuditEntry {

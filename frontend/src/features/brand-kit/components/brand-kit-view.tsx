@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 import { BookOpen, FileText, Image as ImageIcon, Plus, Search, ShieldCheck, Tags } from "lucide-react";
 import { Badge, Button, Card, EmptyState, PageHeader, StatCard, StatusBadge, Tabs, type TabItem } from "@/components/ui";
 import { workspace } from "@/config/site";
-import { KIT_VERSION } from "../data";
-import { removeSource, useBrandKit } from "../store";
+import { can, useSession } from "@/lib/session";
+import { useBrandKit, useBrandKitMeta } from "../store";
 import { AddSourceModal, type SourceKind } from "./add-source-modal";
 import { FactCard, RuleCard, TermRow, VisualAssets } from "./kit-items";
 
@@ -13,6 +13,9 @@ const addKind: Record<TabId, SourceKind> = { rules: "rule", facts: "fact", terms
 
 export function BrandKitView() {
   const kit = useBrandKit();
+  const { version, loaded, error } = useBrandKitMeta();
+  const mayEdit = can.editBrandKit(useSession()?.role);
+  const KIT_VERSION = version || "—";
   const [tab, setTab] = useState<TabId>("rules");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
@@ -34,8 +37,10 @@ export function BrandKitView() {
   return (
     <div>
       <PageHeader eyebrow="Brand governance · Source of truth" title="Brand Kit" description="The approved knowledge Greenlight uses to evaluate content. Changes apply to the very next review."
-        actions={<Button size="lg" onClick={open}><Plus size={16} /> Add source</Button>} />
+        actions={mayEdit ? <Button size="lg" onClick={open}><Plus size={16} /> Add source</Button> : undefined} />
 
+      {error && <p role="alert" className="mb-5 rounded-xl border border-danger/25 bg-danger/10 p-3 text-xs text-danger">{error}</p>}
+      {!mayEdit && loaded && <p className="mb-5 rounded-xl border border-line bg-soft p-3 text-xs text-muted">Only brand admins can add sources. Adding a source creates a new Brand Kit version; sources cannot be deleted yet.</p>}
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={BookOpen} label="Active guidelines" value={kit.rules.length} />
         <StatCard icon={FileText} tone="success" label="Approved facts" value={kit.facts.length} />
@@ -47,7 +52,7 @@ export function BrandKitView() {
         <div className="flex flex-col gap-4 border-b border-line bg-gradient-to-r from-brand/10 via-surface to-surface p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-brand-ink shadow-glow"><ShieldCheck size={22} /></span>
-            <div><div className="text-sm font-bold text-ink">{workspace.name}</div><div className="mt-0.5 text-xs text-muted">Master Brand Kit · Version {KIT_VERSION} · Updated Oct 28, 2026</div></div>
+            <div><div className="text-sm font-bold text-ink">{workspace.name}</div><div className="mt-0.5 text-xs text-muted">Master Brand Kit · Version {KIT_VERSION}</div></div>
           </div>
           <StatusBadge>Published</StatusBadge>
         </div>
@@ -62,17 +67,17 @@ export function BrandKitView() {
                 <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search…" aria-label="Search Brand Kit"
                   className="h-9 w-full rounded-xl border border-line bg-surface pl-9 pr-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-brand focus:ring-4 focus:ring-brand/15" />
               </div>
-              <Button size="sm" onClick={open}><Plus size={13} /> Add</Button>
+              {mayEdit && <Button size="sm" onClick={open}><Plus size={13} /> Add</Button>}
             </div>
           </div>
         )}
 
-        {tab === "rules" && <div className="grid gap-3 px-5 pb-5">{rules.map(r => <RuleCard key={r.id} rule={r} onRemove={() => removeSource(r.id)} />)}{!rules.length && <EmptyState icon={BookOpen} title="No guidelines match your search" />}</div>}
-        {tab === "facts" && <div className="grid gap-3 px-5 pb-5 md:grid-cols-2">{facts.map(f => <FactCard key={f.id} fact={f} onRemove={() => removeSource(f.id)} />)}{!facts.length && <div className="md:col-span-2"><EmptyState icon={FileText} title="No approved facts match your search" /></div>}</div>}
+        {tab === "rules" && <div className="grid gap-3 px-5 pb-5">{rules.map(r => <RuleCard key={r.id} rule={r} />)}{!rules.length && <EmptyState icon={BookOpen} title="No guidelines match your search" />}</div>}
+        {tab === "facts" && <div className="grid gap-3 px-5 pb-5 md:grid-cols-2">{facts.map(f => <FactCard key={f.id} fact={f} />)}{!facts.length && <div className="md:col-span-2"><EmptyState icon={FileText} title="No approved facts match your search" /></div>}</div>}
         {tab === "terms" && (
           <div className="px-5 pb-5">
             <div className="mb-3 grid grid-cols-[1fr_28px_1fr] gap-3 px-3 text-[11px] font-bold uppercase tracking-wider text-muted"><span>Avoid using</span><span /><span>Preferred term</span></div>
-            <div className="space-y-2">{terms.map(t => <TermRow key={t.id} term={t} onRemove={() => removeSource(t.id)} />)}{!terms.length && <EmptyState icon={Tags} title="No terminology rules match your search" />}</div>
+            <div className="space-y-2">{terms.map(t => <TermRow key={t.id} term={t} />)}{!terms.length && <EmptyState icon={Tags} title="No terminology rules match your search" />}</div>
             <p className="mt-4 flex items-center gap-2 text-xs text-muted"><Badge tone="brand">Live</Badge> Terms here are matched by the review engine on every new submission.</p>
           </div>
         )}

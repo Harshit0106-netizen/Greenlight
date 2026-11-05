@@ -5,9 +5,8 @@ import { Download, Printer, Search } from "lucide-react";
 import { Button, Card, EmptyState, PageHeader, Select, Skeleton, StatCard } from "@/components/ui";
 import { FileClock, Gavel, CheckCircle2 } from "lucide-react";
 import { auditMeta } from "@/features/reviews/components/audit-timeline";
-import { useReviews } from "@/features/reviews/lib/store";
+import { useReviews, useReviewsLoaded } from "@/features/reviews/lib/store";
 import type { AuditKind } from "@/features/reviews/types";
-import { useHydrated } from "@/lib/hooks";
 import { cn } from "@/lib/cn";
 import { formatDateTime, pad } from "@/lib/format";
 
@@ -16,7 +15,7 @@ const cell = (v: string) => `"${(/^[=+\-@]/.test(v) ? `'${v}` : v).replace(/"/g,
 
 export function HistoryView() {
   const reviews = useReviews();
-  const hydrated = useHydrated();
+  const hydrated = useReviewsLoaded();
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<AuditKind | "all">("all");
 

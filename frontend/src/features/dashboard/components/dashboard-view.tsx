@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, CheckCircle2, Clock3, FileCheck2, Plus, ShieldAlert, Sparkles, Users } from "lucide-react";
 import { Avatar, Badge, Card, CardHeader, EmptyState, ScoreRing, Skeleton, StatCard, StatusBadge, buttonClass } from "@/components/ui";
-import { currentUser } from "@/config/site";
+import { api } from "@/lib/api";
+import { can, useSession } from "@/lib/session";
+import { useAsync } from "@/lib/use-api";
 import { highOpenCount, brandSafetyScore, isPending } from "@/features/reviews/lib/metrics";
-import { useReviews } from "@/features/reviews/lib/store";
-import { useHydrated } from "@/lib/hooks";
+import { useReviews, useReviewsLoaded } from "@/features/reviews/lib/store";
 import { pad, relativeTime } from "@/lib/format";
 import { sampleKpis } from "../data";
 import { ActivityChart } from "./activity-chart";
@@ -13,7 +14,9 @@ import { DashboardHero } from "./dashboard-hero";
 
 export function DashboardView() {
   const reviews = useReviews();
-  const hydrated = useHydrated();
+  const hydrated = useReviewsLoaded();
+  const user = useSession();
+  const summary = useAsync(() => api.getInsightsSummary()).data;
 
   const attention = reviews.filter(r => r.status === "Needs attention");
   const pending = reviews.filter(isPending);
@@ -25,19 +28,19 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <DashboardHero firstName={currentUser.firstName} />
+      <DashboardHero firstName={(user?.name ?? "there").split(" ")[0]} />
 
       <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        <StatCard icon={FileCheck2} label="Reviews completed" value={sampleKpis.completed} trend="+12.8%" hint="vs. previous 30 days · sample" />
+        <StatCard icon={FileCheck2} label="Reviews completed" value={summary ? pad(summary.reviewed_this_month) : "—"} hint="Submitted this month · live" />
         <StatCard icon={ShieldAlert} tone="danger" label="Needs attention" value={hydrated ? pad(attention.length) : "—"} trend={`${high} high priority`} trendTone="danger" hint="Live from your workspace" />
         <StatCard icon={Clock3} tone="warning" label="Awaiting approval" value={hydrated ? pad(pending.length) : "—"} trend="Live" trendTone="warning" hint="Reviews without a final decision" />
-        <StatCard icon={CheckCircle2} tone="success" label="Approved content" value={sampleKpis.approved} trend={`${sampleKpis.approvalRate}% approval rate`} hint="This month · sample" />
+        <StatCard icon={CheckCircle2} tone="success" label="Approved content" value={summary ? pad(summary.approved_this_month) : "—"} hint="Approved this month · live" />
       </div>
 
       <div className="grid gap-5 2xl:grid-cols-[1.55fr_1fr]">
         <ActivityChart />
         <Card className="overflow-hidden">
-          <CardHeader title="Brand health" description="Workspace consistency index" action={<Badge tone="success" dot>Good standing</Badge>} />
+          <CardHeader title="Brand health" description="Workspace consistency index · sample" action={<Badge tone="success" dot>Good standing</Badge>} />
           <div className="flex flex-col items-center px-5 py-6">
             <ScoreRing value={sampleKpis.brandScore} size={168} stroke={13} label="Brand score" />
             <div className="mt-5 flex w-full items-center justify-between border-t border-line pt-4 text-xs"><span className="text-muted">Compared to last month</span><span className="font-bold text-success">+4 points ↑</span></div>
@@ -50,7 +53,7 @@ export function DashboardView() {
         <Card className="overflow-hidden">
           <CardHeader icon={ShieldAlert} title="Needs your attention" description="Riskiest content first" action={<Link href="/reviews" className="text-xs font-bold text-brand hover:text-brand-strong">View all <ArrowUpRight size={12} className="inline" /></Link>} />
           {!hydrated && <div className="space-y-3 p-5"><Skeleton className="h-14" /><Skeleton className="h-14" /></div>}
-          {hydrated && !queue.length && <EmptyState icon={CheckCircle2} title="You’re all caught up" description="Every review has a final decision." action={<Link href="/reviews/new" className={buttonClass("primary", "md")}><Plus size={14} /> Start a review</Link>} />}
+          {hydrated && !queue.length && <EmptyState icon={CheckCircle2} title="You’re all caught up" description="Every review has a final decision." action={can.submit(user?.role) ? <Link href="/reviews/new" className={buttonClass("primary", "md")}><Plus size={14} /> Start a review</Link> : undefined} />}
           <div className="divide-y divide-line">
             {queue.map(r => (
               <Link key={r.id} href={`/reviews/${r.id}`} className="group flex items-center gap-4 px-5 py-4 transition hover:bg-soft">

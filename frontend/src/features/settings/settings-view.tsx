@@ -2,7 +2,9 @@
 import { useState } from "react";
 import { Bell, Building2, Database, Moon, Palette, RotateCcw, Save, Sun, UserRound } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, PageHeader, StatusBadge, useToast } from "@/components/ui";
-import { currentUser, workspace } from "@/config/site";
+import { workspace } from "@/config/site";
+import { USE_MOCK } from "@/lib/api";
+import { ROLE_LABEL, useSession } from "@/lib/session";
 import { resetBrandKit } from "@/features/brand-kit/store";
 import { resetReviews } from "@/features/reviews/lib/store";
 import { useTheme } from "@/lib/theme";
@@ -21,6 +23,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 
 export function SettingsView() {
   const saved = useSettings();
+  const role = useSession()?.role;
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -56,7 +59,7 @@ export function SettingsView() {
             <div className="grid gap-5 p-5 sm:grid-cols-2">
               <Field label="Display name"><Input value={form.displayName} onChange={e => set("displayName", e.target.value)} /></Field>
               <Field label="Email address"><Input type="email" value={form.email} onChange={e => set("email", e.target.value)} /></Field>
-              <div className="sm:col-span-2"><div className="text-xs font-semibold">Workspace role</div><div className="mt-2"><StatusBadge>{currentUser.role}</StatusBadge></div></div>
+              <div className="sm:col-span-2"><div className="text-xs font-semibold">Workspace role</div><div className="mt-2"><StatusBadge>{role ? ROLE_LABEL[role] : "—"}</StatusBadge></div></div>
             </div>
           </Card>
 
@@ -82,8 +85,8 @@ export function SettingsView() {
           <Card id="data" className="scroll-mt-24">
             <CardHeader icon={Database} title="Demo data" description="Reviews and the Brand Kit live in this browser only." />
             <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-              <p className="max-w-md text-sm leading-6 text-muted">Reset to the original sample reviews and Brand Kit. Useful before a live demo.</p>
-              <Button variant="danger" onClick={() => setConfirm(true)}><RotateCcw size={14} /> Reset demo data</Button>
+              <p className="max-w-md text-sm leading-6 text-muted">{USE_MOCK ? "Reset to the original sample reviews and Brand Kit. Useful before a live demo." : "Clear what this browser stored (activity log, form details). Nothing on the server is changed."}</p>
+              <Button variant="danger" onClick={() => setConfirm(true)}><RotateCcw size={14} /> {USE_MOCK ? "Reset demo data" : "Clear local records"}</Button>
             </div>
           </Card>
 
@@ -94,10 +97,10 @@ export function SettingsView() {
         </div>
       </div>
 
-      <Modal open={confirm} onClose={() => setConfirm(false)} title="Reset demo data?" description="This replaces your local reviews and Brand Kit with the original samples.">
+      <Modal open={confirm} onClose={() => setConfirm(false)} title={USE_MOCK ? "Reset demo data?" : "Clear local records?"} description={USE_MOCK ? "This replaces the mock reviews and Brand Kit with the original samples." : "This only clears this browser. The server keeps all reviews and the Brand Kit."}>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirm(false)}>Cancel</Button>
-          <Button variant="danger" onClick={() => { resetReviews(); resetBrandKit(); setConfirm(false); toast("Demo data restored."); }}>Reset</Button>
+          <Button variant="danger" onClick={() => { resetReviews(); resetBrandKit(); setConfirm(false); toast(USE_MOCK ? "Demo data restored." : "Local records cleared."); }}>Reset</Button>
         </div>
       </Modal>
     </div>

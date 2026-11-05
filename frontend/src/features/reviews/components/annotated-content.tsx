@@ -21,7 +21,7 @@ function markClass(f: Finding, selected: boolean) {
   );
 }
 
-type Props = { review: Review; selectedId: string; onSelect: (id: string) => void; onChange: (text: string) => void; onRestore: () => void };
+type Props = { review: Review; selectedId: string; onSelect: (id: string) => void; onChange?: (text: string) => void; onRestore?: () => void };
 
 export function AnnotatedContent({ review, selectedId, onSelect, onChange, onRestore }: Props) {
   const [editing, setEditing] = useState(false);
@@ -33,11 +33,11 @@ export function AnnotatedContent({ review, selectedId, onSelect, onChange, onRes
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader icon={FileText} title="Submitted content" description={editing ? "Make your corrections here, then explicitly save them to the review." : "Click any highlight to inspect its evidence."}
-        action={editing ? (
+      <CardHeader icon={FileText} title="Submitted content" description={editing ? "Make your corrections here, then explicitly save them to the review." : "Click any highlight to inspect its evidence. Fix flagged wording from the evidence panel."}
+        action={!onChange ? undefined : editing ? (
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => { setDraftText(review.content); setEditing(false); }}>Cancel</Button>
-            <Button size="sm" onClick={() => { onChange(draftText); setEditing(false); }} disabled={unchanged}>Save draft changes</Button>
+            <Button size="sm" onClick={() => { onChange?.(draftText); setEditing(false); }} disabled={unchanged}>Save draft changes</Button>
           </div>
         ) : (
           <button onClick={() => { setDraftText(review.content); setEditing(true); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-soft px-3 py-2 text-xs font-semibold text-muted transition hover:text-ink">
@@ -65,7 +65,7 @@ export function AnnotatedContent({ review, selectedId, onSelect, onChange, onRes
             ))}
             {unmatched > 0 && <span className="text-warning">{unmatched} finding{unmatched > 1 ? "s" : ""} no longer match the copy</span>}
           </div>
-          {!editing && <Button size="sm" variant="secondary" onClick={onRestore} disabled={review.content === review.originalContent}><RotateCcw size={13} /> Restore submitted copy</Button>}
+          {!editing && onRestore && <Button size="sm" variant="secondary" onClick={onRestore} disabled={review.content === review.originalContent}><RotateCcw size={13} /> Restore submitted copy</Button>}
         </div>
       </div>
     </Card>

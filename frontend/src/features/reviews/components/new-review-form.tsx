@@ -6,6 +6,7 @@ import { ArrowLeft, Check, FileText, Info, ScanSearch, ShieldCheck, Sparkles, Wa
 import { Button, Card, CardHeader, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import { workspace } from "@/config/site";
 import { cn } from "@/lib/cn";
+import { can, useSession } from "@/lib/session";
 import { createReview } from "../lib/store";
 import { samples } from "../lib/samples";
 import { CHANNELS, REVIEW_MODES, type ReviewInput } from "../types";
@@ -16,6 +17,7 @@ const blank: ReviewInput = { title: "", channel: "Social media", content: "", in
 
 export function NewReviewForm() {
   const router = useRouter();
+  const role = useSession()?.role;
   const [form, setForm] = useState<ReviewInput>(blank);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -38,10 +40,14 @@ export function NewReviewForm() {
         new Promise(r => setTimeout(r, 2100)) // lets the pipeline animation read as intentional
       ]);
       router.push(`/reviews/${review.id}`);
-    } catch {
-      setError("The review could not be created. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The review could not be created. Please try again.");
       setBusy(false);
     }
+  }
+
+  if (role && !can.submit(role)) {
+    return <div className="rounded-xl border border-line bg-soft p-6 text-sm text-muted">Only creators can submit drafts for review. Switch to a creator account to start one.</div>;
   }
 
   const words = form.content.trim() ? form.content.trim().split(/\s+/).length : 0;

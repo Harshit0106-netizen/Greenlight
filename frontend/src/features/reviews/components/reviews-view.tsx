@@ -3,11 +3,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, FileCheck2, Plus, Search } from "lucide-react";
 import { Avatar, Card, EmptyState, PageHeader, ScoreRing, Select, Skeleton, StatusBadge, buttonClass } from "@/components/ui";
-import { useHydrated } from "@/lib/hooks";
 import { pad, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { brandSafetyScore } from "../lib/metrics";
-import { useReviews } from "../lib/store";
+import { useReviews, useReviewsLoaded } from "../lib/store";
 import type { ReviewStatus } from "../types";
 
 type Filter = "All reviews" | ReviewStatus;
@@ -16,7 +15,7 @@ const cols = "md:grid-cols-[minmax(240px,1.8fr)_1fr_1fr_150px_90px]";
 
 export function ReviewsView() {
   const reviews = useReviews();
-  const hydrated = useHydrated();
+  const hydrated = useReviewsLoaded();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<Filter>("All reviews");
   const [sort, setSort] = useState<"recent" | "risk">("recent");

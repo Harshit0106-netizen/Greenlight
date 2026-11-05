@@ -1,11 +1,13 @@
 "use client";
 import { Bell, CircleHelp, Command, Menu, Search } from "lucide-react";
-import { currentUser, site } from "@/config/site";
+import { site } from "@/config/site";
+import { ROLE_LABEL, useSession } from "@/lib/session";
 import { Avatar } from "@/components/ui";
 import { ThemeToggle } from "./theme-toggle";
 
 type Props = { onMenu: () => void; onSearch: () => void };
 export function Topbar({ onMenu, onSearch }: Props) {
+  const user = useSession();
   return (
     <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 backdrop-blur-xl md:px-8">
       <div className="flex min-w-0 items-center gap-3">
@@ -28,8 +30,8 @@ export function Topbar({ onMenu, onSearch }: Props) {
         </button>
         <div className="mx-2 hidden h-7 w-px bg-line sm:block" />
         <div className="hidden items-center gap-2 sm:flex">
-          <Avatar name={currentUser.name} size={32} />
-          <span className="text-xs font-semibold text-ink">{currentUser.name}</span>
+          <Avatar name={user?.name ?? "—"} size={32} />
+          <span className="text-xs font-semibold text-ink">{user?.name}{user && <span className="ml-1.5 font-medium text-muted">· {ROLE_LABEL[user.role]}</span>}</span>
         </div>
       </div>
     </header>

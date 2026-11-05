@@ -1,8 +1,9 @@
 import {
   Activity, BookOpen, CheckCircle2, FileCheck2, Files, LayoutDashboard, Sparkles, type LucideIcon
 } from "lucide-react";
+import type { UserRole } from "@/types/contract";
 
-export type NavItem = { name: string; href: string; icon: LucideIcon; badge?: "reviews" | "approvals" };
+export type NavItem = { name: string; href: string; icon: LucideIcon; badge?: "reviews" | "approvals"; roles?: UserRole[] };
 export type NavGroup = { label: string; items: NavItem[] };
 
 export const navigation: NavGroup[] = [
@@ -11,7 +12,7 @@ export const navigation: NavGroup[] = [
     items: [
       { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
       { name: "Content reviews", href: "/reviews", icon: FileCheck2, badge: "reviews" },
-      { name: "Approvals", href: "/approvals", icon: CheckCircle2, badge: "approvals" },
+      { name: "Approvals", href: "/approvals", icon: CheckCircle2, badge: "approvals", roles: ["reviewer", "manager"] },
       { name: "Brand Kit", href: "/brand-kit", icon: BookOpen }
     ]
   },
