@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------
+   Design tokens. Values are space-separated RGB channels so Tailwind
+   can apply opacity (bg-brand/10). Add new themes here, nowhere else.
+------------------------------------------------------------------- */
+:root,
+:root[data-theme="light"] {
+  --page: 246 247 251;
+  --surface: 255 255 255;
+  --soft: 241 243 248;
+  --ink: 17 24 39;
+  --muted: 100 112 133;
+  --line: 226 231 239;
+  --brand: 79 91 213;
+  --brand-strong: 62 72 186;
+  --brand-ink: 255 255 255;
+  --success: 18 128 98;
+  --warning: 172 106 14;
+  --danger: 205 62 84;
+  --info: 35 122 160;
+  --rail: 14 21 40;
+  --rail-ink: 232 237 250;
+  --shadow: 16 24 40;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --page: 10 13 21;
+  --surface: 19 25 37;
+  --soft: 15 20 30;
+  --ink: 232 237 246;
+  --muted: 148 160 180;
+  --line: 40 50 68;
+  --brand: 129 140 248;
+  --brand-strong: 165 173 252;
+  --brand-ink: 12 14 32;
+  --success: 84 214 170;
+  --warning: 232 178 96;
+  --danger: 247 118 138;
+  --info: 98 196 226;
+  --rail: 8 12 20;
+  --rail-ink: 232 237 246;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: rgb(var(--page));
+  color: rgb(var(--ink));
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button, input, textarea, select { font: inherit; }
+a { text-decoration: none; color: inherit; }
+::selection { background: rgb(var(--brand) / .25); }
+:focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; }
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--muted) / .45) transparent; }
+select option { background: rgb(var(--surface)); color: rgb(var(--ink)); }
+
+@layer utilities {
+  .bg-grid {
+    background-image:
+      linear-gradient(rgb(255 255 255 / .06) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / .06) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+  .text-gradient {
+    background: linear-gradient(90deg, #b6aaff, #6fe0ea);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .scroll-hide::-webkit-scrollbar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+@media print {
+  aside, header, footer, button, [data-no-print] { display: none !important; }
+  body { background: #fff !important; color: #111 !important; }
+  main { padding: 0 !important; }
+}
