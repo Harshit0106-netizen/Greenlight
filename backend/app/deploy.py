@@ -12,8 +12,26 @@ import os
 log = logging.getLogger("greenlight.deploy")
 ON_VERCEL = bool(os.environ.get("VERCEL"))
 
+def _find_database_url() -> str:
+    """Vercel's Neon integration may add a prefix to the variable name (for example STORAGE_DATABASE_URL).
+    Prefer the pooled connection string; fall back to the unpooled one."""
+    for name in ("DATABASE_URL", "POSTGRES_URL"):
+        if os.environ.get(name):
+            return os.environ[name]
+    names = sorted(os.environ)
+    for suffix in ("_DATABASE_URL", "_POSTGRES_URL", "_URL"):
+        for name in names:
+            value = os.environ[name]
+            if name.endswith(suffix) and "UNPOOLED" not in name and "NON_POOLING" not in name and value.startswith(("postgres://", "postgresql://")):
+                return value
+    for name in names:
+        if os.environ[name].startswith(("postgres://", "postgresql://")):
+            return os.environ[name]
+    return ""
+
+
 if ON_VERCEL:
-    url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or ""
+    url = _find_database_url()
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://"):]
     if url:
