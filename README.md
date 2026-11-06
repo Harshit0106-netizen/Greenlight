@@ -61,7 +61,7 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Choose a demo role on the login screen. Data is stored in your browser.
+Click **Start the guided demo** on the login screen, or pick a role. Data is stored in your browser, and a checklist walks you through every feature.
 
 ### B. Full stack on your machine (no database install needed)
 
@@ -71,7 +71,7 @@ Terminal 1, the backend:
 cd backend
 python -m venv .venv
 source .venv/bin/activate            # Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install -r requirements-local.txt
+pip install -r requirements.txt
 python run_local.py                  # http://localhost:8000/docs
 ```
 
@@ -103,7 +103,7 @@ Sign in with a demo account (password `greenlight-demo`):
 
 ```bash
 cd backend
-pip install -r requirements.txt      # includes sentence-transformers (large)
+pip install -r requirements-full.txt # adds sentence-transformers (large download)
 cp .env.example .env                 # set DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY
 alembic upgrade head
 python -m app.seed
@@ -126,7 +126,7 @@ uvicorn app.main:app --port 8000
 
 | Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_USE_MOCK` | `true` = sample data, `false` = live API |
+| `NEXT_PUBLIC_USE_MOCK` | `true` = demo only (sample data). `false` with an API URL = the login page offers **both** a real sign-in and the demo |
 | `NEXT_PUBLIC_API_URL` | Backend address, without `/api/v1`. Must be `https://` in production. |
 
 These are baked in at build time. On Vercel, change them and redeploy.
@@ -135,7 +135,7 @@ These are baked in at build time. On Vercel, change them and redeploy.
 
 ```bash
 cd backend
-pip install pytest
+pip install -r requirements-dev.txt
 pytest                                                    # SQLite, no setup
 TEST_DATABASE_URL=postgresql://user:pw@localhost/greenlight_test pytest   # real PostgreSQL
 ```
@@ -161,7 +161,18 @@ PROJECT.md          plan, roles, version roadmap
 ## Deploying
 
 - **Frontend → Vercel.** Import the repo and set **Root Directory** to `frontend`. Works as-is in sample-data mode.
-- **Backend → Render, Railway or Fly**, with a managed PostgreSQL that supports pgvector. Set the backend variables above, then point the frontend's `NEXT_PUBLIC_API_URL` at it and redeploy the frontend.
+- **Backend → Vercel** (a second project from the same repo, Root Directory `backend`). Add a Postgres database from Vercel's Storage tab (Neon supports pgvector), set `JWT_SECRET` and `ALLOWED_ORIGIN`, deploy. On first start the app creates its tables and the demo workspace by itself. Details below.
+- **Backend alternatives:** Render, Railway or Fly also work, with any PostgreSQL that supports pgvector.
+
+### Backend on Vercel
+
+1. New Project → import this repo → set **Root Directory** to `backend`. Vercel detects FastAPI from `requirements.txt` and `index.py`.
+2. Storage tab → create a Postgres database (Neon) and connect it to this project. This adds `DATABASE_URL` (or `POSTGRES_URL`) automatically.
+3. Environment variables: `JWT_SECRET` (random, 32+ characters; the app refuses to start without it) and `ALLOWED_ORIGIN` (your frontend's production URL, no trailing slash). `ANTHROPIC_API_KEY` is optional.
+4. Deploy, then open `<backend-url>/health` and `<backend-url>/docs`.
+5. In the frontend's Vercel project set `NEXT_PUBLIC_USE_MOCK=false` and `NEXT_PUBLIC_API_URL=<backend-url>`, then redeploy it.
+
+Without a database attached, the backend falls back to a temporary SQLite file that resets, which is fine for a quick look but not for sharing. Embeddings use the built-in fallback on Vercel because `sentence-transformers` is too large for a serverless bundle.
 
 ## Status and known limits
 
@@ -169,7 +180,7 @@ Working: authentication and roles, the versioned Brand Kit, the full detection p
 
 Not yet done:
 
-- Not yet run on hosted PostgreSQL with pgvector or against a live Claude key.
+- Verified on PostgreSQL 16 with pgvector locally, but not yet on a live hosted Vercel/Neon deployment or against a live Claude key.
 - No labelled test set, so detection precision is unmeasured.
 - No endpoints to read a review's audit trail or its comments, to edit a draft directly, or to delete a Brand Kit source.
 - No signup or password reset. Users come from the seed script.

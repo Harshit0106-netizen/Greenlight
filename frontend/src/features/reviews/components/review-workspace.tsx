@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Printer, SearchX } from "lucide-react";
 import { Button, Card, EmptyState, PageHeader, Skeleton, useToast, buttonClass } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
+import { markTour } from "@/features/tour/store";
 import { can, useSession } from "@/lib/session";
 import { approveReview, decideFinding, requestChanges, rewriteFinding, useReview, useReviewsLoaded } from "../lib/store";
 import type { FindingStatus } from "../types";
@@ -27,6 +28,7 @@ export function ReviewWorkspace({ id }: { id: string }) {
   const user = useSession();
   const { toast } = useToast();
   const [selected, setSelected] = useState("");
+  const pick = (id: string) => { setSelected(id); markTour("evidence"); };
   const [busy, setBusy] = useState(false);
   const findings = review?.findings ?? [];
   const current = findings.find(f => f.id === selected) ?? findings[0];
@@ -87,8 +89,8 @@ export function ReviewWorkspace({ id }: { id: string }) {
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          <AnnotatedContent review={review} selectedId={current?.id ?? ""} onSelect={setSelected} />
-          <FindingList findings={findings} selectedId={current?.id ?? ""} onSelect={setSelected} />
+          <AnnotatedContent review={review} selectedId={current?.id ?? ""} onSelect={pick} />
+          <FindingList findings={findings} selectedId={current?.id ?? ""} onSelect={pick} />
         </div>
         <div className="space-y-5 xl:sticky xl:top-20">
           <FindingEvidence finding={current} canApply={canApply} canResolve={canResolve} busy={busy}

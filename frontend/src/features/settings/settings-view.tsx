@@ -3,8 +3,7 @@ import { useState } from "react";
 import { Bell, Building2, Database, Moon, Palette, RotateCcw, Save, Sun, UserRound } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, PageHeader, StatusBadge, useToast } from "@/components/ui";
 import { workspace } from "@/config/site";
-import { USE_MOCK } from "@/lib/api";
-import { ROLE_LABEL, useSession } from "@/lib/session";
+import { ROLE_LABEL, useIsDemo, useSession } from "@/lib/session";
 import { resetBrandKit } from "@/features/brand-kit/store";
 import { resetReviews } from "@/features/reviews/lib/store";
 import { useTheme } from "@/lib/theme";
@@ -24,6 +23,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 export function SettingsView() {
   const saved = useSettings();
   const role = useSession()?.role;
+  const USE_MOCK = useIsDemo();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [draft, setDraft] = useState<Settings | null>(null);

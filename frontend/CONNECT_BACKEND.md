@@ -14,7 +14,7 @@ mock backend and the live API, so connecting is configuration, not code.
    ```
 3. On the backend set `ALLOWED_ORIGIN` to the frontend URL (for example `http://localhost:3000`), then `npm run dev`.
 
-The top bar shows **Sample data** or **Live** so nobody mistakes one for the other.
+With these two settings the login page shows a real sign-in for registered users **and** a "Start the guided demo" option. The demo uses built-in sample data in the visitor's browser; the live sign-in uses your backend. They never share data. The top bar shows **Demo** or **Live** so nobody mistakes one for the other. In the demo a role menu lets visitors switch between Creator, Reviewer, Brand admin and Manager, and a guided checklist walks them through the whole workflow.
 
 ## Already verified
 

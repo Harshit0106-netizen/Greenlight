@@ -11,8 +11,32 @@ import { mockRequest } from "./mockData";
 const DEFAULT_TIMEOUT_MS = 12_000;
 const TOKEN_KEY = "greenlight-access-token";
 
-/** NEXT_PUBLIC_USE_MOCK=true (default) serves contract-shaped fake data; false talks to the live backend. */
-export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== "false";
+/**
+ * Demo or live is chosen at sign-in, not at build time, so one deployment can offer both.
+ *   NEXT_PUBLIC_USE_MOCK=false + NEXT_PUBLIC_API_URL set -> live sign-in is available (demo is still offered)
+ *   anything else                                       -> demo only (built-in sample data, no server)
+ */
+export const LIVE_AVAILABLE = process.env.NEXT_PUBLIC_USE_MOCK === "false" && Boolean(process.env.NEXT_PUBLIC_API_URL?.trim());
+export type DataMode = "demo" | "live";
+const MODE_KEY = "greenlight-mode";
+export function getMode(): DataMode {
+  if (!LIVE_AVAILABLE) return "demo";
+  try { return window.sessionStorage.getItem(MODE_KEY) === "demo" ? "demo" : "live"; } catch { return "live"; }
+}
+export function setMode(mode: DataMode): void {
+  try { window.sessionStorage.setItem(MODE_KEY, mode); } catch { /* private mode */ }
+}
+export const isDemo = (): boolean => getMode() === "demo";
+
+/** Is the live backend reachable? Used by the login page. The first call after idle can take ~10s (cold start). */
+export async function pingApi(): Promise<boolean> {
+  if (!LIVE_AVAILABLE) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try { return (await fetch(`${apiBaseUrl()}/health`, { signal: controller.signal })).ok; }
+  catch { return false; }
+  finally { clearTimeout(timer); }
+}
 
 let unauthorizedHandler: (() => void) | null = null;
 /** The session module registers this so an expired token sends the user back to /login. */
@@ -41,7 +65,7 @@ export function hasAccessToken(): boolean {
 }
 
 async function request<T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> {
-  if (USE_MOCK) {
+  if (isDemo()) {
     try { return await mockRequest<T>(path, init, getAccessToken()); }
     catch (error) {
       if (error instanceof ApiError && error.status === 401 && authenticated) { clearAccessToken(); unauthorizedHandler?.(); }

@@ -1,5 +1,7 @@
 "use client";
+import { useEffect } from "react";
 import Link from "next/link";
+import { markTour } from "@/features/tour/store";
 import { Activity, AlertTriangle, ArrowUpRight, BarChart3, CheckCircle2, Clock3, Lightbulb } from "lucide-react";
 import { Card, CardHeader, PageHeader, Skeleton, StatCard } from "@/components/ui";
 import { categoryLabel } from "@/features/reviews/lib/adapters";
@@ -11,6 +13,7 @@ import { useAsync } from "@/lib/use-api";
 /** Live numbers only. Nothing on this page is sample data. */
 export function InsightsView() {
   const role = useSession()?.role;
+  useEffect(() => { markTour("insights"); }, []);
   const summary = useAsync(() => api.getInsightsSummary());
   const gaps = useAsync(() => api.getInsightGaps(), can.seeGaps(role));
   const issues = (summary.data?.top_issues ?? []).map(t => ({ name: categoryLabel[t.type] ?? t.type, count: t.count }));

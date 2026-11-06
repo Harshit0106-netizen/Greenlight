@@ -2,6 +2,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { BrandSource } from "@/types/contract";
 import { api } from "@/lib/api";
+import { markTour } from "@/features/tour/store";
 import { getSessionUser, onSessionChange } from "@/lib/session";
 import { seedKit } from "./data";
 import type { ApprovedFact, BrandKit, BrandRule, BrandTerm } from "./types";
@@ -60,6 +61,7 @@ export function resetBrandKit() { state = BLANK; listeners.forEach(l => l()); en
 
 async function add(kind: BrandSource["kind"], title: string, text: string) {
   await api.createBrandSource({ kind, title: title.trim(), text: text.trim() });
+  markTour("kit");
   await load();
 }
 export const addRule = (r: { title: string; description: string }) => add("guideline", r.title, r.description);

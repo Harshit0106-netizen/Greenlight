@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
 import type { BrandSource } from "@/types/contract";
-import { api, USE_MOCK } from "@/lib/api";
+import { api, getMode, isDemo } from "@/lib/api";
 import { uid } from "@/lib/format";
 import { resetMockDb } from "@/lib/mockData";
 import { createPersistentStore } from "@/lib/persistent-store";
 import { getSessionUser, onSessionChange } from "@/lib/session";
 import { reviewFromApi, type ReviewMeta } from "./adapters";
+import { markTour, resetTour } from "@/features/tour/store";
 import { canApprove } from "./metrics";
 import type { AuditEntry, AuditKind, FindingStatus, Review, ReviewInput } from "../types";
 
@@ -29,19 +30,21 @@ function set(next: Partial<State>) { state = { ...state, ...next }; listeners.fo
 
 const metaStore = createPersistentStore<Record<string, ReviewMeta>>("greenlight-review-meta-v1", () => ({}), {});
 const auditStore = createPersistentStore<Record<string, AuditEntry[]>>("greenlight-audit-v1", () => ({}), {});
-const dataSource: Review["source"] = USE_MOCK ? "local-demo" : "api";
+const dataSource = (): Review["source"] => (isDemo() ? "local-demo" : "api");
+/** Local records are namespaced by mode so demo and live reviews (which share id formats) never mix. */
+const key = (id: string) => `${getMode()}:${id}`;
 
 const actorName = () => getSessionUser()?.name ?? "You";
 const clip = (s: string) => (s.length > 48 ? `${s.slice(0, 48)}…` : s);
 function log(reviewId: string, kind: AuditKind, message: string, findingId?: string, actor = actorName()) {
   const e: AuditEntry = { id: uid("AU"), at: new Date().toISOString(), actor, kind, message, findingId };
-  auditStore.update(all => ({ ...all, [reviewId]: [...(all[reviewId] ?? []), e] }));
+  auditStore.update(all => ({ ...all, [key(reviewId)]: [...(all[key(reviewId)] ?? []), e] }));
 }
 
 async function fetchReview(id: string): Promise<Review | null> {
   try {
     const [detail, findings] = await Promise.all([api.getReview(id), api.getFindings(id)]);
-    return reviewFromApi(detail, findings, sources, metaStore.read()[id], auditStore.read()[id] ?? [], dataSource);
+    return reviewFromApi(detail, findings, sources, metaStore.read()[key(id)], auditStore.read()[key(id)] ?? [], dataSource());
   } catch { return null; }
 }
 async function refreshOne(id: string) {
@@ -78,16 +81,18 @@ export function useReview(id: string): Review | undefined { useEnsure(); return 
 export function useReviewsLoaded(): boolean { useEnsure(); return useSyncExternalStore(subscribe, () => state.loaded, () => false); }
 export function useReviewsError(): string { return useSyncExternalStore(subscribe, () => state.error, () => ""); }
 
-/** Clears what this browser stored. In mock mode it also restores the demo workspace; the live backend is never touched. */
-export function resetReviews() {
-  metaStore.reset(); auditStore.reset();
-  if (USE_MOCK) resetMockDb();
+/** Clears this browser's records for the current mode. In demo it also restores the sample workspace; the live backend is never touched. */
+export function resetReviews(mode = getMode()) {
+  const keep = <T,>(all: Record<string, T>) => Object.fromEntries(Object.entries(all).filter(([k]) => !k.startsWith(`${mode}:`)));
+  metaStore.update(keep); auditStore.update(keep);
+  if (mode === "demo") { resetMockDb(); resetTour(); }
   reloadReviews();
 }
 
 export async function createReview(input: ReviewInput): Promise<Review> {
   const created = await api.createReview({ title: input.title, content: input.content, intent_note: input.intent ?? "" });
-  metaStore.update(m => ({ ...m, [created.id]: { channel: input.channel, mode: input.mode, intent: input.intent, original: input.content } }));
+  metaStore.update(m => ({ ...m, [key(created.id)]: { channel: input.channel, mode: input.mode, intent: input.intent, original: input.content } }));
+  markTour("submit");
   log(created.id, "submitted", "Submitted for review");
   log(created.id, "analysis", `${created.finding_count} potential issue${created.finding_count === 1 ? "" : "s"} found by the checks. Human review is required.`, undefined, "Greenlight");
   await refreshOne(created.id);
@@ -104,6 +109,7 @@ export async function decideFinding(id: string, findingId: string, status: Extra
   await api.updateFinding(findingId, { action: status === "Accepted" ? "accepted" : "disputed", reason: reason.trim(), edited_text: null });
   log(id, "finding", `${verb[status]} “${clip(f?.quote ?? "")}”${reason.trim() ? ` — ${reason.trim()}` : ""}`, findingId);
   await refreshOne(id);
+  if (state.reviews.find(r => r.id === id)?.status === "In review") markTour("resolve");
 }
 
 /** Replaces the flagged phrase through the API (the server rewrites the draft and records a new version). */
@@ -112,11 +118,12 @@ export async function rewriteFinding(id: string, findingId: string, replacement:
   if (!f || !replacement.trim()) return;
   await api.updateFinding(findingId, { action: "edited", reason: via === "suggestion" ? "Applied the suggested wording." : "Replaced the flagged wording.", edited_text: replacement.trim() });
   metaStore.update(m => {
-    const cur = m[id] ?? {};
-    return { ...m, [id]: { ...cur, originals: { ...cur.originals, [findingId]: cur.originals?.[findingId] ?? f.quote } } };
+    const cur = m[key(id)] ?? {};
+    return { ...m, [key(id)]: { ...cur, originals: { ...cur.originals, [findingId]: cur.originals?.[findingId] ?? f.quote } } };
   });
   log(id, "edit", `${via === "suggestion" ? "Applied suggested wording to" : "Replaced flagged wording in"} “${clip(f.quote)}”`, findingId);
   await refreshOne(id);
+  if (state.reviews.find(r => r.id === id)?.status === "In review") markTour("resolve");
 }
 
 /** Reviewer only (the server enforces it). Approval is blocked while any finding is open or only confirmed. */
@@ -125,6 +132,7 @@ export async function approveReview(id: string, note = ""): Promise<boolean> {
   if (!review || !canApprove(review)) return false;
   await api.approveReview(id, { note });
   log(id, "status", `Approved content for publication${note.trim() ? ` — ${note.trim()}` : ""}`);
+  markTour("approve");
   await refreshOne(id);
   return true;
 }

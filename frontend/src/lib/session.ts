@@ -1,7 +1,8 @@
 "use client";
 import { useSyncExternalStore } from "react";
 import type { ApiUser, UserRole } from "@/types/contract";
-import { api, clearAccessToken, getAccessToken, setUnauthorizedHandler } from "./api";
+import { api, clearAccessToken, getAccessToken, getMode, isDemo, setMode, setUnauthorizedHandler, type DataMode } from "./api";
+import { MOCK_PASSWORD, MOCK_USERS } from "./mockData";
 
 /**
  * Who is signed in. The token lives in sessionStorage (see api.ts); the public user profile sits next to it.
@@ -38,11 +39,26 @@ export const getSessionUser = read;
 /** Data stores subscribe here to drop and reload their data when the user changes. */
 export function onSessionChange(fn: () => void): () => void { sessionListeners.add(fn); return () => { sessionListeners.delete(fn); }; }
 
-export async function signIn(email: string, password: string): Promise<ApiUser> {
-  const result = await api.login({ email: email.trim(), password });
-  write(result.user);
-  return result.user;
+/** Sign in against the live API or the built-in demo. The mode is remembered for this tab only. */
+export async function signIn(email: string, password: string, mode: DataMode = getMode()): Promise<ApiUser> {
+  const previous = getMode();
+  setMode(mode);
+  try {
+    const result = await api.login({ email: email.trim(), password });
+    write(result.user);
+    return result.user;
+  } catch (error) {
+    setMode(previous);
+    throw error;
+  }
 }
+/** Demo only: jump to another role without signing out. Lets anyone see every role's view in seconds. */
+export async function switchDemoRole(role: UserRole): Promise<void> {
+  const target = MOCK_USERS.find(u => u.role === role);
+  if (target) await signIn(target.email, MOCK_PASSWORD, "demo");
+}
+/** True while the signed-in session is the built-in demo. Re-renders when the user or mode changes. */
+export const useIsDemo = (): boolean => useSyncExternalStore(subscribe, () => isDemo(), () => false);
 export function signOut(): void {
   api.logout();
   clearAccessToken();
