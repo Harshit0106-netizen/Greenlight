@@ -3,7 +3,7 @@ import { ArrowUpRight, ShieldCheck, Sparkles, Wand2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
 
 /** Always-dark hero: it is the product pitch, so it keeps its own palette in both themes. */
-export function DashboardHero({ firstName }: { firstName: string }) {
+export function DashboardHero({ firstName, canSubmit }: { firstName: string; canSubmit: boolean }) {
   return (
     <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(115deg,#12142e_0%,#161d3d_50%,#0f2f40_100%)] px-6 py-8 shadow-lift md:px-10 md:py-10">
       <div className="bg-grid pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]" />
@@ -11,7 +11,7 @@ export function DashboardHero({ firstName }: { firstName: string }) {
       <div className="relative grid items-center gap-8 lg:grid-cols-[1.1fr_.9fr]">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-white/80">
-            <Sparkles size={12} /> Good morning, {firstName}
+            <Sparkles size={12} /> Welcome back{firstName ? `, ${firstName}` : ""}
           </div>
           <h2 className="mt-4 max-w-xl text-3xl font-bold leading-[1.1] tracking-tight text-white md:text-[42px]">
             Make every piece of content <span className="text-gradient">brand-right.</span>
@@ -20,7 +20,9 @@ export function DashboardHero({ firstName }: { firstName: string }) {
             Greenlight checks copy against your approved standards, shows the exact evidence, and keeps the final decision in human hands.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/reviews/new?sample=risky" className={buttonClass("primary", "lg", "!bg-white !text-[#141c33] hover:!bg-white/90")}><Wand2 size={16} /> Run a 30-second demo</Link>
+            {canSubmit
+              ? <Link href="/reviews/new?sample=risky" className={buttonClass("primary", "lg", "!bg-white !text-[#141c33] hover:!bg-white/90")}><Wand2 size={16} /> Try a sample draft</Link>
+              : <Link href="/reviews" className={buttonClass("primary", "lg", "!bg-white !text-[#141c33] hover:!bg-white/90")}>Open reviews <ArrowUpRight size={15} /></Link>}
             <Link href="/brand-kit" className={buttonClass("ghost", "lg", "border border-white/20 !text-white hover:!bg-white/10")}>Explore Brand Kit <ArrowUpRight size={15} /></Link>
           </div>
         </div>

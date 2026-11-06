@@ -14,3 +14,7 @@ export function LogoMark({ size = 36, className }: { size?: number; className?: 
     </svg>
   );
 }
+
+export function Wordmark({ className }: { className?: string }) {
+  return <span className={cn("text-[17px] font-extrabold tracking-tight", className)}>greenlight<span className="text-brand">.</span></span>;
+}

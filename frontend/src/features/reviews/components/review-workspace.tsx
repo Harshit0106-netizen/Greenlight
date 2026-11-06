@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, History, Info, Printer, SearchX } from "lucide-react";
-import { Button, Card, CardHeader, EmptyState, PageHeader, Skeleton, useToast, buttonClass } from "@/components/ui";
+import { ArrowLeft, Printer, SearchX } from "lucide-react";
+import { Button, Card, EmptyState, PageHeader, Skeleton, useToast, buttonClass } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
 import { can, useSession } from "@/lib/session";
 import { approveReview, decideFinding, requestChanges, rewriteFinding, useReview, useReviewsLoaded } from "../lib/store";
@@ -79,34 +79,39 @@ export function ReviewWorkspace({ id }: { id: string }) {
   return (
     <div>
       <Link href="/reviews" className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-muted transition hover:text-brand"><ArrowLeft size={14} /> All reviews</Link>
-      <PageHeader eyebrow={`Review ${review.id} · ${review.channel}`} title={review.title}
+      <PageHeader eyebrow={`${review.id} · ${review.channel}`} title={review.title}
         description={`Submitted by ${review.creator} · updated ${relativeTime(review.updatedAt)}`}
         actions={<Button variant="secondary" onClick={() => window.print()}><Printer size={15} /> Print report</Button>} />
 
       <ReviewSummary review={review} />
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="space-y-5">
           <AnnotatedContent review={review} selectedId={current?.id ?? ""} onSelect={setSelected} />
           <FindingList findings={findings} selectedId={current?.id ?? ""} onSelect={setSelected} />
         </div>
-        <div className="space-y-5">
+        <div className="space-y-5 xl:sticky xl:top-20">
           <FindingEvidence finding={current} canApply={canApply} canResolve={canResolve} busy={busy}
+            position={current ? { index: findings.findIndex(f => f.id === current.id) + 1, total: findings.length, onStep: d => { const i = findings.findIndex(f => f.id === current.id); const n = findings[i + d]; if (n) setSelected(n.id); } } : undefined}
             onDecide={decide} onApply={() => current && rewrite(current.suggestion, "suggestion")} onRewrite={t => rewrite(t, "manual")} />
           <ReviewOutcome review={review} canDecide={can.decide(user?.role)} busy={busy}
             onApprove={note => run(async () => { const ok = await approveReview(id, note); if (!ok) throw new Error("Approval is blocked until every finding is edited or marked not applicable."); }, "Review approved. Every finding has a recorded decision.")}
-            onRequestChanges={note => run(() => requestChanges(id, note), "Changes requested. The creator has been notified in the review.", "info")} />
-          <AiDisclosureCard reviewId={id} />
-          <Card><CardHeader icon={History} title="Activity in this browser" description="Who decided what, and when" /><AuditTimeline entries={review.audit} />
-            <p className="border-t border-line px-5 py-3 text-xs leading-5 text-muted">The server keeps the authoritative audit trail. This list shows what happened in this browser until the API exposes the full trail.</p></Card>
-          <div className="flex gap-3 rounded-xl border border-warning/25 bg-warning/10 p-4 text-xs leading-5 text-ink/80">
-            <Info size={15} className="mt-0.5 shrink-0 text-warning" />
-            {review.source === "api"
-              ? "Findings come from the Greenlight API. Each one is tied to an exact quote and an approved source; anything the verifier could not confirm was dropped. A person makes the final decision."
-              : "Demo data: findings come from the built-in mock backend, which applies the same workflow rules as the API using simple rule checks, not an AI model."}
-          </div>
+            onRequestChanges={note => run(() => requestChanges(id, note), "Changes requested. The creator will see your note.", "info")} />
+          <details className="group rounded-xl border border-line bg-surface">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 text-sm font-semibold text-ink">
+              Details: AI use and activity <span className="text-xs font-normal text-muted group-open:hidden">Show</span><span className="hidden text-xs font-normal text-muted group-open:inline">Hide</span>
+            </summary>
+            <div className="space-y-5 border-t border-line p-4">
+              <AiDisclosureCard reviewId={id} />
+              <Card><AuditTimeline entries={review.audit} />
+                <p className="border-t border-line px-5 py-3 text-xs leading-5 text-muted">Shows what happened in this browser. The server keeps the authoritative audit trail.</p></Card>
+            </div>
+          </details>
         </div>
       </div>
+      <p className="mt-8 text-center text-xs text-muted">
+        {review.source === "api" ? "Each flag is tied to an exact quote and an approved source. Anything the verifier could not confirm was dropped." : "Sample data: flags come from the built-in mock backend, which uses the same workflow rules as the API."}
+      </p>
     </div>
   );
 }

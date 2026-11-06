@@ -27,9 +27,9 @@ const config: Config = {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"]
       },
       boxShadow: {
-        card: "0 1px 2px rgb(var(--shadow) / .05), 0 10px 28px -14px rgb(var(--shadow) / .12)",
-        lift: "0 2px 4px rgb(var(--shadow) / .06), 0 18px 40px -16px rgb(var(--shadow) / .22)",
-        glow: "0 8px 30px -8px rgb(var(--brand) / .55)"
+        card: "0 1px 2px rgb(var(--shadow) / .04)",
+        lift: "0 1px 3px rgb(var(--shadow) / .06), 0 10px 24px -14px rgb(var(--shadow) / .16)",
+        glow: "none"
       },
       keyframes: {
         "fade-up": { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "none" } },

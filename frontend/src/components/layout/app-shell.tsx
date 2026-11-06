@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         <div className="lg:pl-[256px]">
           <Topbar onMenu={() => setMobileOpen(true)} onSearch={() => setPaletteOpen(true)} />
-          <main className="mx-auto min-h-[calc(100vh-130px)] max-w-[1480px] px-4 py-7 md:px-8 md:py-9">
+          <main className="mx-auto min-h-[calc(100vh-110px)] max-w-[1360px] px-4 py-7 md:px-8 md:py-9">
             {loadError && (
               <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/25 bg-danger/10 p-3.5 text-sm text-danger">
                 <span>{loadError}</span>
@@ -52,9 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
             {children}
           </main>
-          <footer className="border-t border-line px-6 py-5 text-center text-[11px] text-muted">
-            {site.name.toUpperCase()} · {site.tagline} · {process.env.NEXT_PUBLIC_USE_MOCK === "false" ? "Live workspace" : "Demo workspace · mock data"}
-          </footer>
+          <footer className="px-6 py-5 text-center text-xs text-muted">{site.name} · People make the final decision.</footer>
         </div>
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       </div>

@@ -1,8 +1,8 @@
 "use client";
-import { Bell, CircleHelp, Command, Menu, Search } from "lucide-react";
-import { site } from "@/config/site";
-import { ROLE_LABEL, useSession } from "@/lib/session";
+import { Command, Menu, Search } from "lucide-react";
 import { Avatar } from "@/components/ui";
+import { USE_MOCK } from "@/lib/api";
+import { ROLE_LABEL, useSession } from "@/lib/session";
 import { ThemeToggle } from "./theme-toggle";
 
 type Props = { onMenu: () => void; onSearch: () => void };
@@ -17,17 +17,13 @@ export function Topbar({ onMenu, onSearch }: Props) {
           <Search size={15} /><span className="flex-1 truncate text-left">Search or jump to…</span>
           <kbd className="hidden items-center gap-0.5 rounded-md border border-line bg-surface px-1.5 py-1 text-[10px] font-semibold sm:inline-flex"><Command size={10} />K</kbd>
         </button>
-        <span className="text-sm font-bold sm:hidden">{site.name.toLowerCase()}<span className="text-brand">.</span></span>
       </div>
       <div className="flex items-center gap-1">
-        <span className="mr-2 hidden items-center gap-2 rounded-full border border-success/20 bg-success/10 px-3 py-1.5 text-[11px] font-semibold text-success md:flex">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" /> All systems operational
+        <span title={USE_MOCK ? "Sample data, nothing is sent to a server" : "Connected to the Greenlight API"}
+          className={`mr-2 hidden items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold md:flex ${USE_MOCK ? "border-warning/25 bg-warning/10 text-warning" : "border-success/20 bg-success/10 text-success"}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${USE_MOCK ? "bg-warning" : "animate-pulse bg-success"}`} />{USE_MOCK ? "Sample data" : "Live"}
         </span>
-        <button aria-label="Help" className="hidden rounded-xl p-2.5 text-muted transition hover:bg-soft hover:text-ink sm:block"><CircleHelp size={17} /></button>
         <ThemeToggle />
-        <button aria-label="Notifications" className="relative rounded-xl p-2.5 text-muted transition hover:bg-soft hover:text-ink">
-          <Bell size={17} /><span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand ring-2 ring-surface" />
-        </button>
         <div className="mx-2 hidden h-7 w-px bg-line sm:block" />
         <div className="hidden items-center gap-2 sm:flex">
           <Avatar name={user?.name ?? "—"} size={32} />

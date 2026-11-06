@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Check, CheckCheck, Copy, Pencil, ShieldQuestion, ThumbsDown } from "lucide-react";
+import { Check, CheckCheck, ChevronLeft, ChevronRight, Copy, Pencil, ShieldQuestion, ThumbsDown } from "lucide-react";
 import { Button, Card, CardHeader, StatusBadge, Textarea, useToast } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Finding, FindingStatus } from "../types";
@@ -11,6 +11,8 @@ type Props = {
   /** Only the creator of the review can resolve findings; others read the evidence. */
   canResolve: boolean;
   busy?: boolean;
+  /** 1-based position and total, with a stepper (J / K also work). */
+  position?: { index: number; total: number; onStep: (delta: -1 | 1) => void };
   onDecide: (status: Extract<FindingStatus, "Accepted" | "Disputed">, reason?: string) => void;
   onApply: () => void;
   onRewrite: (text: string) => void;
@@ -18,7 +20,7 @@ type Props = {
 
 const Label = ({ children }: { children: string }) => <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{children}</div>;
 
-export function FindingEvidence({ finding, canApply, canResolve, busy, onDecide, onApply, onRewrite }: Props) {
+export function FindingEvidence({ finding, canApply, canResolve, busy, position, onDecide, onApply, onRewrite }: Props) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
@@ -27,7 +29,7 @@ export function FindingEvidence({ finding, canApply, canResolve, busy, onDecide,
 
   if (!finding) {
     return (
-      <Card><CardHeader icon={ShieldQuestion} title="Finding evidence" />
+      <Card><CardHeader icon={ShieldQuestion} title="Finding" />
         <p className="p-10 text-center text-sm text-muted">Choose a finding to inspect its evidence.</p></Card>
     );
   }
@@ -40,7 +42,14 @@ export function FindingEvidence({ finding, canApply, canResolve, busy, onDecide,
 
   return (
     <Card key={f.id} className="animate-fade-in overflow-hidden">
-      <CardHeader icon={ShieldQuestion} title="Finding evidence" action={<StatusBadge>{f.status}</StatusBadge>} />
+      <CardHeader icon={ShieldQuestion} title={position ? `Finding ${position.index} of ${position.total}` : "Finding"}
+        action={<div className="flex items-center gap-2">
+          <StatusBadge>{f.status}</StatusBadge>
+          {position && position.total > 1 && (<div className="flex">
+            <button onClick={() => position.onStep(-1)} disabled={position.index <= 1} aria-label="Previous finding" className="rounded-md p-1.5 text-muted transition hover:bg-soft disabled:opacity-30"><ChevronLeft size={16} /></button>
+            <button onClick={() => position.onStep(1)} disabled={position.index >= position.total} aria-label="Next finding" className="rounded-md p-1.5 text-muted transition hover:bg-soft disabled:opacity-30"><ChevronRight size={16} /></button>
+          </div>)}
+        </div>} />
       <div className="space-y-5 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge dot={false}>{f.severity}</StatusBadge>
@@ -48,7 +57,7 @@ export function FindingEvidence({ finding, canApply, canResolve, busy, onDecide,
           <span className="ml-auto text-xs text-muted">{f.method === "ai_assisted" ? "AI-assisted · verified against your text" : "Rule-based check"} · {f.confidence}% confidence</span>
         </div>
 
-        <div className={cn("rounded-xl border-l-4 p-4", f.status === "Edited" ? "border-success bg-success/10" : "border-danger bg-danger/10")}>
+        <div className={cn("rounded-lg border-l-4 p-4", f.status === "Edited" ? "border-success bg-success/10" : "border-danger bg-danger/10")}>
           {f.status === "Edited" ? (
             <>
               {f.originalQuote && (<><Label>Original wording</Label><p className="mt-1.5 text-[15px] leading-6 text-ink line-through decoration-danger/50">“{f.originalQuote}”</p></>)}

@@ -14,7 +14,7 @@ export function Modal({ open, onClose, title, description, children, className }
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button aria-label="Close dialog" className="absolute inset-0 animate-fade-in bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <button aria-label="Close dialog" className="absolute inset-0 animate-fade-in bg-black/40" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-label={title} className={cn("relative w-full max-w-lg animate-pop rounded-2xl border border-line bg-surface p-6 shadow-lift", className)}>
         <div className="flex items-start justify-between gap-4">
           <div>
