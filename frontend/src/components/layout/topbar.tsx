@@ -1,5 +1,6 @@
 "use client";
-import { Command, Menu, Search } from "lucide-react";
+import { Command, Compass, Menu, Search } from "lucide-react";
+import { setTourOpen, tourStore } from "@/features/tour/store";
 import { Avatar } from "@/components/ui";
 import { ROLE_LABEL, useIsDemo, useSession } from "@/lib/session";
 import { RoleSwitcher } from "./role-switcher";
@@ -9,6 +10,8 @@ type Props = { onMenu: () => void; onSearch: () => void };
 export function Topbar({ onMenu, onSearch }: Props) {
   const user = useSession();
   const demo = useIsDemo();
+  const tour = tourStore.use();
+  const tourDone = Object.keys(tour.done).length;
   return (
     <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 backdrop-blur-xl md:px-8">
       <div className="flex min-w-0 items-center gap-3">
@@ -24,6 +27,12 @@ export function Topbar({ onMenu, onSearch }: Props) {
           className={`mr-2 hidden items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold md:flex ${demo ? "border-warning/25 bg-warning/10 text-warning" : "border-success/20 bg-success/10 text-success"}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${demo ? "bg-warning" : "animate-pulse bg-success"}`} />{demo ? "Demo" : "Live"}
         </span>
+        {demo && (
+          <button onClick={() => setTourOpen(!tour.open)} aria-pressed={tour.open} title="Show or hide the guided tour"
+            className={`mr-1 hidden items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition md:flex ${tour.open ? "bg-brand/10 text-brand" : "text-muted hover:bg-soft hover:text-ink"}`}>
+            <Compass size={15} /> Tour <span className="text-muted">{tourDone}/6</span>
+          </button>
+        )}
         <ThemeToggle />
         <div className="mx-2 hidden h-7 w-px bg-line sm:block" />
         {demo ? <RoleSwitcher /> : (

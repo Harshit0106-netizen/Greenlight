@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Compass, ShieldCheck } from "lucide-react";
+import { ArrowRight, Compass, ShieldCheck } from "lucide-react";
 import { Button, Field, Input } from "@/components/ui";
 import { LogoMark, Wordmark } from "@/components/layout/logo";
+import { workspace } from "@/config/site";
 import { LIVE_AVAILABLE, pingApi } from "@/lib/api";
 import { useHydrated } from "@/lib/hooks";
 import { MOCK_PASSWORD, MOCK_USERS } from "@/lib/mockData";
@@ -11,22 +12,9 @@ import { ROLE_LABEL, signIn, useSession } from "@/lib/session";
 import { resetReviews } from "@/features/reviews/lib/store";
 import { resetTour, setTourOpen } from "@/features/tour/store";
 
-const ROLE_HINT = {
-  creator: "Submit a draft and fix what is flagged",
-  reviewer: "Approve it or send it back",
-  manager: "See everything, read-only",
-  brand_admin: "Own the rules and facts",
-} as const;
-
-const FEATURES = [
-  "Every flag shows the exact quote and the approved rule or fact behind it.",
-  "A claim with no evidence is flagged as unsupported, never guessed at.",
-  "Creators fix, reviewers decide. The software never approves anything.",
-  "The Brand Kit is versioned, and the next review uses the change at once.",
-  "Each review records what was and was not sent to an AI service.",
-];
-
 type Health = "checking" | "online" | "offline";
+const ORDER = ["creator", "reviewer", "brand_admin", "manager"] as const;
+const accounts = ORDER.map(role => MOCK_USERS.find(u => u.role === role)!);
 
 export function LoginView() {
   const router = useRouter();
@@ -52,101 +40,106 @@ export function LoginView() {
     try { await signIn(email, password, "live"); router.replace("/dashboard"); }
     catch (err) { setError(err instanceof Error ? err.message : "Could not sign in."); setBusy(""); }
   }
-  async function demoSignIn(role: (typeof MOCK_USERS)[number], fresh = false) {
+  async function demoSignIn(target: (typeof accounts)[number], fresh = false) {
     setBusy("demo"); setError("");
     try {
       if (fresh) { resetReviews("demo"); resetTour(); }
       setTourOpen(true);
-      await signIn(role.email, MOCK_PASSWORD, "demo");
+      await signIn(target.email, MOCK_PASSWORD, "demo");
       router.replace("/dashboard");
     } catch (err) { setError(err instanceof Error ? err.message : "Could not start the demo."); setBusy(""); }
   }
 
-  const creator = MOCK_USERS.find(u => u.role === "creator")!;
   return (
-    <main className="grid min-h-screen bg-surface text-ink lg:grid-cols-[minmax(440px,1fr)_1.1fr]">
-      <section className="flex flex-col px-6 py-8 sm:px-12 lg:px-16">
-        <div className="flex items-center gap-2.5"><LogoMark size={30} /><Wordmark className="text-lg" /></div>
+    <main className="grid min-h-screen bg-surface text-ink lg:grid-cols-[minmax(520px,1.75fr)_1fr]">
+      <section className="flex flex-col px-6 py-8 sm:px-14 lg:px-20 xl:px-28">
+        <div className="flex items-center gap-3"><LogoMark size={34} /><Wordmark className="text-xl" /></div>
 
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
+        <div className="mx-auto flex w-full max-w-[460px] flex-1 flex-col justify-center py-10">
+          <div className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-line bg-soft px-3 py-1 text-xs font-semibold text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand" />{workspace.name} workspace
+          </div>
+          <h1 className="text-[34px] font-bold leading-tight tracking-tight">{LIVE_AVAILABLE ? "Welcome back" : "Explore Greenlight"}</h1>
+          <p className="mt-2 text-[15px] leading-6 text-muted">
+            {LIVE_AVAILABLE ? "Sign in with your registered email and password. The backend is live." : "This deployment runs on built-in sample data. Pick a role to try the product."}
+          </p>
+
           {LIVE_AVAILABLE && (
             <>
-              <h1 className="text-3xl font-semibold leading-tight">Sign in</h1>
-              <p className="mt-2 text-sm leading-6 text-muted">The backend is live. Sign in with your registered email and password.</p>
-              <p className="mt-3 flex items-center gap-2 text-xs text-muted" role="status">
+              <p className="mt-4 flex items-center gap-2 text-xs text-muted" role="status">
                 <span className={`h-2 w-2 rounded-full ${health === "online" ? "bg-success" : health === "checking" ? "animate-pulse bg-warning" : "bg-danger"}`} />
-                {health === "online" ? "Live backend online" : health === "checking" ? "Checking the live backend… the first request can take about 10 seconds" : "Live backend not responding. You can still explore the demo below."}
+                {health === "online" ? "Live backend online" : health === "checking" ? "Connecting to the live backend. The first request can take about 10 seconds." : "The live backend is not responding. You can still try the demo below."}
               </p>
+
               <form onSubmit={liveSignIn} className="mt-6 space-y-4">
-                <Field label="Registered email"><Input type="email" required autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" /></Field>
-                <Field label="Password"><Input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} /></Field>
-                {error && <p role="alert" className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2.5 text-xs text-danger">{error}</p>}
-                <Button type="submit" size="lg" loading={busy === "live"} disabled={busy === "demo"} className="w-full">Sign in <ArrowRight size={15} /></Button>
+                <Field label="Email"><Input type="email" required autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="h-12 text-[15px]" /></Field>
+                <Field label="Password"><Input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="h-12 text-[15px]" /></Field>
+                {error && <p role="alert" className="rounded-xl border border-danger/25 bg-danger/10 px-3.5 py-3 text-sm text-danger">{error}</p>}
+                <Button type="submit" size="lg" loading={busy === "live"} disabled={busy === "demo"} className="h-12 w-full text-[15px]">Sign in <ArrowRight size={16} /></Button>
               </form>
-              <div className="my-8 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />Just looking around?<span className="h-px flex-1 bg-line" /></div>
+
+              <div className="mt-5 rounded-2xl border border-line bg-soft/60 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted">Test accounts · live backend</span>
+                  <span className="text-[11px] text-muted">Password for all: <code className="rounded bg-surface px-1.5 py-0.5 font-semibold text-ink">{MOCK_PASSWORD}</code></span>
+                </div>
+                <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                  {accounts.map(a => (
+                    <li key={a.id}>
+                      <button type="button" onClick={() => { setEmail(a.email); setPassword(MOCK_PASSWORD); setError(""); }}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2 text-left transition hover:border-brand/50">
+                        <span className="min-w-0"><span className="block text-xs font-bold">{ROLE_LABEL[a.role]}</span><span className="block truncate text-[11px] text-muted">{a.email}</span></span>
+                        <span className="shrink-0 text-[11px] font-semibold text-brand">Fill in</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[11px] leading-4 text-muted">Click one to fill the form, then press Sign in. These are sample accounts on a demo workspace, so feel free to create reviews.</p>
+              </div>
+
+              <div className="my-7 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />or look around without signing in<span className="h-px flex-1 bg-line" /></div>
             </>
           )}
 
-          {!LIVE_AVAILABLE && (
-            <>
-              <h1 className="text-3xl font-semibold leading-tight">Explore Greenlight</h1>
-              <p className="mt-2 text-sm leading-6 text-muted">This deployment runs on built-in sample data, so there is nothing to sign in to. Pick a role to try the product.</p>
-              {error && <p role="alert" className="mt-4 rounded-lg border border-danger/25 bg-danger/10 px-3 py-2.5 text-xs text-danger">{error}</p>}
-            </>
-          )}
+          {!LIVE_AVAILABLE && error && <p role="alert" className="mt-4 rounded-xl border border-danger/25 bg-danger/10 px-3.5 py-3 text-sm text-danger">{error}</p>}
 
-          <div className={LIVE_AVAILABLE ? "" : "mt-6"}>
-            <button type="button" disabled={busy !== ""} onClick={() => demoSignIn(creator, true)}
+          <div className={LIVE_AVAILABLE ? "" : "mt-7"}>
+            <button type="button" disabled={busy !== ""} onClick={() => demoSignIn(accounts[0], true)}
               className="group flex w-full items-center gap-4 rounded-2xl border border-brand/30 bg-brand/5 p-4 text-left transition hover:border-brand hover:bg-brand/10 disabled:opacity-60">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-ink"><Compass size={20} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-bold">Start the guided demo</span>
-                <span className="mt-0.5 block text-xs leading-5 text-muted">A 2-minute walk through the whole workflow, with a checklist that follows you. Sample data, nothing leaves your browser.</span>
+                <span className="mt-0.5 block text-xs leading-5 text-muted">A two-minute walk through the whole workflow. Sample data stays in your browser.</span>
               </span>
               <ArrowRight size={16} className="shrink-0 text-brand transition group-hover:translate-x-0.5" />
             </button>
-
-            <div className="mt-5 text-xs font-semibold text-muted">Or jump straight into a role</div>
-            <div className="mt-2 grid grid-cols-2 gap-2.5">
-              {MOCK_USERS.map(u => (
-                <button key={u.id} type="button" disabled={busy !== ""} onClick={() => demoSignIn(u)}
-                  className="rounded-xl border border-line p-3.5 text-left transition hover:border-brand/50 hover:bg-brand/5 disabled:opacity-60">
-                  <span className="block text-sm font-semibold">{ROLE_LABEL[u.role]}</span>
-                  <span className="mt-0.5 block text-xs leading-4 text-muted">{ROLE_HINT[u.role]}</span>
-                </button>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+              Or open as
+              {accounts.map(a => (
+                <button key={a.id} type="button" disabled={busy !== ""} onClick={() => demoSignIn(a)}
+                  className="rounded-full border border-line px-3 py-1.5 font-semibold text-ink transition hover:border-brand/50 hover:bg-brand/5 disabled:opacity-60">{ROLE_LABEL[a.role]}</button>
               ))}
             </div>
-            <p className="mt-3 text-[11px] text-muted">You can switch role at any time from the menu at the top.</p>
           </div>
         </div>
+
+        <p className="text-center text-[11px] text-muted">Need an account? Ask your workspace admin. Sessions end after one hour.</p>
       </section>
 
-      <aside className="relative hidden flex-col justify-center overflow-hidden bg-[linear-gradient(115deg,#12142e_0%,#161d3d_50%,#0f2f40_100%)] px-14 py-12 text-white lg:flex xl:px-20" aria-label="About Greenlight">
-        <div className="bg-grid pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]" />
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand/25 blur-[100px]" />
+      <aside className="relative hidden flex-col justify-center overflow-hidden bg-[linear-gradient(115deg,#12142e_0%,#161d3d_50%,#0f2f40_100%)] px-10 py-12 text-white lg:flex xl:px-14" aria-label="About Greenlight">
+        <div className="bg-grid pointer-events-none absolute inset-0 opacity-30 [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-brand/25 blur-[90px]" />
         <div className="relative">
-          <h2 className="max-w-lg text-[42px] font-bold leading-[1.08] tracking-tight">Know what you’re publishing <span className="text-gradient">before you publish it.</span></h2>
-          <p className="mt-5 max-w-md text-[15px] leading-7 text-white/65">
-            Greenlight reads every draft against your approved brand rules and facts, shows the exact evidence for each flag, and leaves the decision to a person.
-          </p>
-
-          <div className="mt-9 max-w-md rounded-2xl border border-white/15 bg-white/[.07] p-5 shadow-2xl backdrop-blur-xl" aria-hidden>
-            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/50"><ShieldCheck size={13} /> Finding · High · Unsupported claim</div>
-            <p className="mt-3 text-[15px] leading-7 text-white/85">
+          <h2 className="text-[28px] font-bold leading-[1.15] tracking-tight">Know what you’re publishing <span className="text-gradient">before you publish it.</span></h2>
+          <div className="mt-8 rounded-2xl border border-white/15 bg-white/[.07] p-4 shadow-2xl backdrop-blur-xl" aria-hidden>
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-white/50"><ShieldCheck size={12} /> High · Unsupported claim</div>
+            <p className="mt-2.5 text-sm leading-6 text-white/85">
               Order today.{" "}
               <mark className="rounded bg-rose-400/25 px-1 text-white underline decoration-rose-300 decoration-wavy decoration-[1.5px] underline-offset-[5px]">India’s #1 fastest delivery, guaranteed.</mark>
             </p>
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-white/45">Approved source</div>
-              <p className="mt-1 text-xs leading-5 text-white/70">Guideline G-4.2 · no approved fact supports “#1”.</p>
-            </div>
-            <div className="mt-3 rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3 text-xs text-emerald-100">Suggested: Fast delivery is available in select cities.</div>
+            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-2.5 text-[11px] leading-4 text-white/65">Guideline G-4.2 · no approved fact supports “#1”.</div>
           </div>
-
-          <div className="mt-9 text-[11px] font-bold uppercase tracking-[.16em] text-white/45">What you can try</div>
-          <ul className="mt-3 max-w-md space-y-2.5">
-            {FEATURES.map(f => <li key={f} className="flex items-start gap-3 text-sm leading-6 text-white/80"><Check size={16} className="mt-1 shrink-0 text-emerald-300" />{f}</li>)}
-          </ul>
+          <p className="mt-6 text-xs leading-5 text-white/55">Every flag shows its evidence. A person makes the final call.</p>
         </div>
       </aside>
     </main>

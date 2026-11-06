@@ -6,7 +6,7 @@ import { ToastProvider } from "@/components/ui";
 import { useTheme } from "@/lib/theme";
 import { useHydrated } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
-import { TourWidget } from "@/features/tour/tour-widget";
+import { TourBar } from "@/features/tour/tour-bar";
 import { reloadReviews, useReviewsError } from "@/features/reviews/lib/store";
 import { CommandPalette } from "./command-palette";
 import { Sidebar } from "./sidebar";
@@ -45,6 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="lg:pl-[256px]">
           <Topbar onMenu={() => setMobileOpen(true)} onSearch={() => setPaletteOpen(true)} />
           <main className="mx-auto min-h-[calc(100vh-110px)] max-w-[1360px] px-4 py-7 md:px-8 md:py-9">
+            <TourBar />
             {loadError && (
               <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/25 bg-danger/10 p-3.5 text-sm text-danger">
                 <span>{loadError}</span>
@@ -55,7 +56,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </main>
           <footer className="px-6 py-5 text-center text-xs text-muted">{site.name} · People make the final decision.</footer>
         </div>
-        <TourWidget />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       </div>
     </ToastProvider>

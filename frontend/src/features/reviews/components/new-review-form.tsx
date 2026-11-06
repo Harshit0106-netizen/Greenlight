@@ -49,9 +49,10 @@ export function NewReviewForm() {
   return (
     <div className="mx-auto max-w-3xl">
       <Link href="/reviews" className="mb-5 inline-flex items-center gap-2 text-xs font-medium text-muted transition hover:text-ink"><ArrowLeft size={14} /> Reviews</Link>
-      <PageHeader title="New review" description="Paste the copy as you intend to publish it. You’ll see every flag with its evidence in seconds." />
+      <PageHeader title="New review" description="Paste the copy as you intend to publish it. You’ll see every flag with its evidence in seconds."
+        actions={<Button type="submit" form="new-review-form" size="lg" loading={busy}><ScanSearch size={16} /> {busy ? "Checking…" : "Run review"}</Button>} />
 
-      <form onSubmit={submit} className="space-y-6">
+      <form id="new-review-form" onSubmit={submit} className="space-y-6">
         <Card>
           <CardHeader icon={FileText} title="Draft" description="Paste the copy exactly as you intend to publish it."
             action={<div className="flex gap-1">
