@@ -34,7 +34,8 @@ class EmbeddingType(TypeDecorator):
 
 def make_engine(url: str | None = None):
     url = url or get_settings().sqlalchemy_url
-    engine = create_engine(url, pool_pre_ping=True, future=True)
+    kwargs = {"connect_args": {"prepare_threshold": None}} if url.startswith("postgresql") else {}  # safe behind PgBouncer-style poolers
+    engine = create_engine(url, pool_pre_ping=True, future=True, **kwargs)
     if engine.dialect.name == "postgresql":
 
         @event.listens_for(engine, "connect")

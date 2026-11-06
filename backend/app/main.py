@@ -1,4 +1,5 @@
 """Greenlight API. Returns JSON only; never renders pages."""
+from app import deploy  # noqa: F401  (must stay first: prepares the environment on Vercel)
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,8 @@ app.add_exception_handler(Exception, errors.unhandled_error_handler)
 
 for r in (auth, brand_kit, reviews, findings, approvals, insights):
     app.include_router(r.router)
+
+deploy.bootstrap()  # no-op except on Vercel
 
 
 @app.get("/health", tags=["meta"])

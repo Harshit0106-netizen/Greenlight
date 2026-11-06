@@ -1,56 +1,185 @@
 # Greenlight
 
-**Pre-publication brand governance.** Greenlight checks draft content against a company's approved brand knowledge before it goes out, shows *why* something was flagged, and leaves the final call to a human.
+**Pre-publication brand governance.** Greenlight checks a draft against a company's approved brand rules and facts *before* it goes out, shows exactly why each phrase was flagged, and leaves the final decision to a person.
 
-Team Phoenix: Harshit Verma (frontend, lead) and Ruchir Bharadwaj (backend). The plan is in [`PROJECT.md`](PROJECT.md); the API contract is in [`docs/API.md`](docs/API.md).
+> "India's #1 fastest delivery, guaranteed." → **High · Unsupported claim.** Guideline G-4.2: no approved fact supports "#1". Suggested wording from approved fact F-12: *Fast delivery is available in select cities.*
 
-## Status
+Team Phoenix: Harshit Verma (frontend, lead) and Ruchir Bharadwaj (backend). The plan lives in [`PROJECT.md`](PROJECT.md) and the API contract in [`docs/API.md`](docs/API.md).
 
-| Part | State |
+---
+
+## What it does
+
+1. A **creator** submits a draft.
+2. Greenlight flags risky phrases. Every flag carries an exact quote, the approved source behind it, a reason, and a confidence level.
+3. The creator **edits** the wording or **disputes** the flag with a written reason.
+4. A **reviewer** approves the draft or sends it back with a note.
+
+Principles that are enforced in code, not just promised:
+
+- **No source, no finding.** Anything the verifier cannot tie to the draft text and to an approved source is dropped.
+- **Unsupported is not false.** A claim with no evidence is flagged as unsupported, never declared untrue.
+- **Only people approve.** The software cannot approve or publish.
+- **AI use is disclosed.** Each review has a record of what was and was not sent to an AI service.
+
+## Roles
+
+| Role | Can do |
 |---|---|
-| `backend/` | **Built through v4**: auth + roles, versioned Brand Kit with pgvector embeddings, detection pipeline (split, rules, retrieve, Claude judge, verifier, scorer), review state machine, comments, audit events, insights, AI disclosure. 75 tests. |
-| `frontend/` | Existing prototype. `lib/api.ts` has the mock/live switch and reads the contract's error shape. **Screens still run on the local demo store**; switching them to the API (MEET A onward) is the next step. |
+| Creator | Submit drafts, edit or dispute findings on their own reviews |
+| Reviewer | Approve or request changes on reviews that reached `in_review` |
+| Brand admin | Add Brand Kit sources, see guideline-gap insights |
+| Manager | Read-only view of the whole workspace and insights |
 
-## Run it
+## Architecture
 
-**Backend** (Python 3.11+, PostgreSQL with the `pgvector` extension)
-
-```bash
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env                 # set DATABASE_URL, JWT_SECRET (32+ chars); ANTHROPIC_API_KEY is optional
-alembic upgrade head                 # creates the schema (and the vector extension)
-python -m app.seed                   # fictional Acme workspace + 4 demo users
-uvicorn app.main:app --reload --port 8000    # http://localhost:8000/docs
+```
+ Browser  ──►  frontend (Next.js)  ──►  backend (FastAPI)  ──►  PostgreSQL + pgvector
+                    │                         │
+                    │                         └──►  Claude (optional judge step)
+                    └── mock backend (sample data, no server needed)
 ```
 
-Demo logins (password `greenlight-demo`): `aarav@acme.com` creator, `harshit@acme.com` manager, `priya@acme.com` reviewer, `ruchir@acme.com` brand_admin.
+Detection pipeline: `draft → split → rules → retrieve → judge → verify → score → findings`
 
-Without `ANTHROPIC_API_KEY` the pipeline runs in **rules-only mode** and says so in the AI disclosure. With a key, one sentence plus its matched sources goes to Claude per call, and everything it returns must still pass the verifier.
+- **rules**: deterministic checks (claims, terminology, tone, accessibility).
+- **retrieve**: finds the most relevant approved sources using embeddings.
+- **judge**: Claude assesses the subtler cases. Optional: without an API key the pipeline runs in *rules-only mode* and says so.
+- **verify**: drops any finding whose quote is not at the stated position, whose source is not in the review's Brand Kit version, or whose suggestion invents a claim.
 
-**Frontend**
+The frontend reads and writes only through `frontend/src/lib/api.ts`, which switches between the mock and the live API with one setting.
+
+## Quick start
+
+You need **Node.js 20+** and **Python 3.11+**.
+
+### A. Frontend only (sample data, no backend)
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local           # NEXT_PUBLIC_USE_MOCK=true -> fake data; false -> live backend
-npm run dev                          # http://localhost:3000
+npm run dev          # http://localhost:3000
 ```
 
-**Tests**
+Choose a demo role on the login screen. Data is stored in your browser.
+
+### B. Full stack on your machine (no database install needed)
+
+Terminal 1, the backend:
 
 ```bash
-cd backend && pytest                                   # SQLite, no setup needed
-TEST_DATABASE_URL=postgresql://user:pw@localhost/greenlight_test pytest   # real PostgreSQL + pgvector
+cd backend
+python -m venv .venv
+source .venv/bin/activate            # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements-local.txt
+python run_local.py                  # http://localhost:8000/docs
 ```
 
-## How detection works
+Terminal 2, the frontend, pointed at it. Create `frontend/.env.local`:
 
-`draft -> split -> rules -> retrieve -> judge -> verify -> score -> findings`
+```
+NEXT_PUBLIC_USE_MOCK=false
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-The verifier drops any finding whose quote is not at the stated position in the draft, whose source is not in the review's Brand Kit version (right kind and version), or whose suggestion adds a claim without an approved fact. No source, no finding. No evidence means "unsupported", never "false". Only humans approve.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Embeddings
+Sign in with a demo account (password `greenlight-demo`):
 
-`sentence-transformers` (self-hosted, 384-dim) is used when installed. If it is not, a built-in hashing embedder keeps the service running, so retrieval quality is lower; install it for real use. Vectors are stored in a pgvector `vector(384)` column; similarity is computed in Python, which is fine for a Brand Kit of hundreds of sources (switch to SQL `<=>` plus an index if it grows).
+| Email | Role |
+|---|---|
+| `aarav@acme.com` | creator |
+| `priya@acme.com` | reviewer |
+| `ruchir@acme.com` | brand admin |
+| `harshit@acme.com` | manager |
+
+`run_local.py` uses a local SQLite file (`local_greenlight.db`) and creates the demo workspace on first run. Delete that file to start fresh. Restart the frontend after changing `.env.local`.
+
+### C. Production stack (PostgreSQL with pgvector)
+
+```bash
+cd backend
+pip install -r requirements.txt      # includes sentence-transformers (large)
+cp .env.example .env                 # set DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY
+alembic upgrade head
+python -m app.seed
+uvicorn app.main:app --port 8000
+```
+
+## Configuration
+
+**Backend** (`backend/.env`)
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | `postgresql://user:password@host:5432/greenlight` |
+| `JWT_SECRET` | Long random string (32+ characters). Required to be changed when `APP_ENV=production`. |
+| `ANTHROPIC_API_KEY` | Optional. Without it, rules-only mode. |
+| `ALLOWED_ORIGIN` | The frontend's address, for example `https://your-app.vercel.app` |
+| `APP_ENV` | `production` makes the server refuse the default secret |
+
+**Frontend** (`frontend/.env.local`, or Vercel environment variables)
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_USE_MOCK` | `true` = sample data, `false` = live API |
+| `NEXT_PUBLIC_API_URL` | Backend address, without `/api/v1`. Must be `https://` in production. |
+
+These are baked in at build time. On Vercel, change them and redeploy.
+
+## Tests
+
+```bash
+cd backend
+pip install pytest
+pytest                                                    # SQLite, no setup
+TEST_DATABASE_URL=postgresql://user:pw@localhost/greenlight_test pytest   # real PostgreSQL
+```
+
+75 tests cover the contract, permissions, state transitions, the pipeline and the verifier.
+
+## Project layout
+
+```
+backend/
+  app/routers/      HTTP endpoints (auth, reviews, findings, approvals, brand_kit, insights)
+  app/pipeline/     split, rules, retrieve, judge, verify, score
+  app/services/     workflow, Brand Kit, insights, AI disclosure
+  tests/
+frontend/
+  src/lib/          api.ts (mock/live switch), mockData.ts, session.ts
+  src/features/     reviews, brand-kit, approvals, dashboard, insights, auth
+  CONNECT_BACKEND.md
+docs/API.md         the contract both sides build to
+PROJECT.md          plan, roles, version roadmap
+```
+
+## Deploying
+
+- **Frontend → Vercel.** Import the repo and set **Root Directory** to `frontend`. Works as-is in sample-data mode.
+- **Backend → Render, Railway or Fly**, with a managed PostgreSQL that supports pgvector. Set the backend variables above, then point the frontend's `NEXT_PUBLIC_API_URL` at it and redeploy the frontend.
+
+## Status and known limits
+
+Working: authentication and roles, the versioned Brand Kit, the full detection pipeline, the review workflow, insights, per-review AI disclosure, and a frontend verified end to end against both the mock and the real backend.
+
+Not yet done:
+
+- Not yet run on hosted PostgreSQL with pgvector or against a live Claude key.
+- No labelled test set, so detection precision is unmeasured.
+- No endpoints to read a review's audit trail or its comments, to edit a draft directly, or to delete a Brand Kit source.
+- No signup or password reset. Users come from the seed script.
+- No login rate limiting or error monitoring.
+- Text only. Image and PDF checks are not built.
+
+## Embeddings note
+
+`sentence-transformers` (self-hosted, 384 dimensions) is used when installed. Otherwise a built-in hashing embedder keeps the service running at lower retrieval quality. Install it for real use. Similarity is computed in Python, which is fine for a Brand Kit of hundreds of sources.
+
+## Don't commit
+
+`.venv/`, `node_modules/`, `.next/`, `.env` and `.env.local` files, and `*.db` files. The provided `.gitignore` already covers them.
