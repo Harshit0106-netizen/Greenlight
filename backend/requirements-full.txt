@@ -1,0 +1,3 @@
+-r requirements.txt
+# Self-hosted embeddings for better retrieval (large download, about 2 GB). Not for Vercel.
+sentence-transformers>=3.0

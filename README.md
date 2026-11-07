@@ -1,87 +1,196 @@
 # Greenlight
 
-**Pre-publication brand governance.** Submit content, check it against approved brand knowledge, inspect evidence-backed findings, and record a human decision before anything is published.
+**Pre-publication brand governance.** Greenlight checks a draft against a company's approved brand rules and facts *before* it goes out, shows exactly why each phrase was flagged, and leaves the final decision to a person.
 
-## Run
+> "India's #1 fastest delivery, guaranteed." → **High · Unsupported claim.** Guideline G-4.2: no approved fact supports "#1". Suggested wording from approved fact F-12: *Fast delivery is available in select cities.*
+
+Team Phoenix: Harshit Verma (frontend, lead) and Ruchir Bharadwaj (backend). The plan lives in [`PROJECT.md`](PROJECT.md) and the API contract in [`docs/API.md`](docs/API.md).
+
+---
+
+## What it does
+
+1. A **creator** submits a draft.
+2. Greenlight flags risky phrases. Every flag carries an exact quote, the approved source behind it, a reason, and a confidence level.
+3. The creator **edits** the wording or **disputes** the flag with a written reason.
+4. A **reviewer** approves the draft or sends it back with a note.
+
+Principles that are enforced in code, not just promised:
+
+- **No source, no finding.** Anything the verifier cannot tie to the draft text and to an approved source is dropped.
+- **Unsupported is not false.** A claim with no evidence is flagged as unsupported, never declared untrue.
+- **Only people approve.** The software cannot approve or publish.
+- **AI use is disclosed.** Each review has a record of what was and was not sent to an AI service.
+
+## Roles
+
+| Role | Can do |
+|---|---|
+| Creator | Submit drafts, edit or dispute findings on their own reviews |
+| Reviewer | Approve or request changes on reviews that reached `in_review` |
+| Brand admin | Add Brand Kit sources, see guideline-gap insights |
+| Manager | Read-only view of the whole workspace and insights |
+
+## Architecture
+
+```
+ Browser  ──►  frontend (Next.js)  ──►  backend (FastAPI)  ──►  PostgreSQL + pgvector
+                    │                         │
+                    │                         └──►  Claude (optional judge step)
+                    └── mock backend (sample data, no server needed)
+```
+
+Detection pipeline: `draft → split → rules → retrieve → judge → verify → score → findings`
+
+- **rules**: deterministic checks (claims, terminology, tone, accessibility).
+- **retrieve**: finds the most relevant approved sources using embeddings.
+- **judge**: Claude assesses the subtler cases. Optional: without an API key the pipeline runs in *rules-only mode* and says so.
+- **verify**: drops any finding whose quote is not at the stated position, whose source is not in the review's Brand Kit version, or whose suggestion invents a claim.
+
+The frontend reads and writes only through `frontend/src/lib/api.ts`, which switches between the mock and the live API with one setting.
+
+## Quick start
+
+You need **Node.js 20+** and **Python 3.11+**.
+
+### A. Frontend only (sample data, no backend)
 
 ```bash
+cd frontend
 npm install
-cp .env.example .env.local   # optional: set NEXT_PUBLIC_API_URL for the FastAPI service
-npm run dev                  # http://localhost:3000
-npm run typecheck
+npm run dev          # http://localhost:3000
 ```
-Node 20.9+. On PowerShell use `Copy-Item .env.example .env.local` and `npm.cmd` if `npm.ps1` is blocked.
 
-## 60-second demo script
-1. **Overview** → *Run a 30-second demo* (risky copy is preloaded) → *Run brand review*.
-2. In the **review workspace**, findings are highlighted inline in the copy. Click one: matched text, why, the approved-source receipt, a suggested fix.
-3. *Apply suggestion* → the copy changes, the safety score rises, the audit trail records it. `J` / `K` move between findings.
-4. Disposition every finding → **Approve**. Humans decide; the tool never publishes.
-5. **Brand Kit** → add a terminology rule (e.g. avoid "Premium") → run another review: it is enforced immediately.
-6. **Audit history** → *Export CSV*. `Ctrl/⌘ K` opens the command palette. Settings → *Reset demo data* before each run.
+Click **Start the guided demo** on the login screen, or pick a role. Data is stored in your browser, and a checklist walks you through every feature.
 
-## Structure (feature-based)
+### B. Full stack on your machine (no database install needed)
+
+Terminal 1, the backend:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate            # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python run_local.py                  # http://localhost:8000/docs
 ```
-src/
-  app/(workspace)/        Thin route files only: metadata + one feature view each
-  config/                 site.ts (brand, user, workspace), navigation.ts
-  components/
-    ui/                   Design system: Button, Card, Badge, Modal, Tabs, Toast, ScoreRing, Field…
-    layout/               AppShell, Sidebar, Topbar, CommandPalette, ThemeToggle
-  features/
-    reviews/              types · lib/{engine,provider,store,seed,samples,metrics,segments} · components/
-    brand-kit/            types · data · store (live source of truth read by the engine) · components/
-    dashboard/ approvals/ history/ insights/ transparency/ settings/
-  lib/                    cn, format, persistent-store, hooks, theme
+
+Terminal 2, the frontend, pointed at it. Create `frontend/.env.local`:
+
 ```
-Rules of the road: pages never contain logic; features never import from each other's `components/`
-(only `lib`/`store`/`types`); anything reusable moves to `components/ui`.
+NEXT_PUBLIC_USE_MOCK=false
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-## Design system
-Tokens live in `src/app/globals.css` (RGB channels per theme) and are exposed in `tailwind.config.ts`
-(`bg-surface`, `text-muted`, `border-line`, `bg-brand/10`…). Light and Dark are fully token-driven, so there are
-no per-theme overrides. Add a theme by adding one `[data-theme]` block. Status/severity colours come from one
-`StatusBadge`; do not hard-code palette colours in features.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Data layer and the backend seam
-- `lib/persistent-store.ts` is the local demo adapter (reviews, Brand Kit, settings, theme). It is not the audit system of record.
-- `features/reviews/lib/store.ts` currently powers the UI with local demo persistence. Keep it intact until the backend is available and contract integration can be tested.
-- `src/types/contract.ts` mirrors the fixed wire contract in `PROJECT.md`.
-- `src/lib/api.ts` is the centralised typed HTTP client for the agreed endpoints. It handles bearer-token attachment, request timeouts, JSON parsing and API errors.
-- The current review provider still runs the local deterministic demo engine. Do not set live mode or claim backend integration until the repository adapter is connected and tested against Ruchir's service.
+Sign in with a demo account (password `greenlight-demo`):
 
-Environment: `NEXT_PUBLIC_API_URL=http://localhost:8000` and `NEXT_PUBLIC_USE_MOCK=true`. The mock switch is documented for the upcoming repository integration; the existing UI remains on its local demo store for now.
+| Email | Role |
+|---|---|
+| `aarav@acme.com` | creator |
+| `priya@acme.com` | reviewer |
+| `ruchir@acme.com` | brand admin |
+| `harshit@acme.com` | manager |
 
-**Contract rule:** API paths and wire fields are defined in `PROJECT.md` and must not be renamed or reshaped. Finding evidence must be validated against an approved source ID and version as well as the exact submitted span; quote-substring checking alone is not sufficient. CORS must allow the frontend origin.
+`run_local.py` uses a local SQLite file (`local_greenlight.db`) and creates the demo workspace on first run. Delete that file to start fresh. Restart the frontend after changing `.env.local`.
 
-## Honest limitations
-Local checks are transparent heuristics, not an LLM, and do not prove compliance. Sample analytics (charts, KPIs
-marked *sample*) are illustrative. No auth, image/OCR inspection or server persistence yet.
+### C. Production stack (PostgreSQL with pgvector)
 
-## Principles
-Findings cite exact text and a versioned source · no match means "not substantiated", not "false" ·
-suggestions never publish · humans own approval · every decision is logged.
+```bash
+cd backend
+pip install -r requirements-full.txt # adds sentence-transformers (large download)
+cp .env.example .env                 # set DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY
+alembic upgrade head
+python -m app.seed
+uvicorn app.main:app --port 8000
+```
 
-## Claim-check regression cases
+## Configuration
 
-The local demo engine should flag these as **potentially unsupported claims**, not as proven false statements:
+**Backend** (`backend/.env`)
 
-- `We are #1 in the field.` → flags `#1`
-- `We are leading the field.` → flags `leading the field`
-- `We are the best.` → flags `the best`
-- `We are the leading producers of jackets.` → flags `leading producers`
-- `We are market leaders.` → flags `market leaders`
-- `Our product has a 750 ml capacity.` → no comparative-claim flag
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | `postgresql://user:password@host:5432/greenlight` |
+| `JWT_SECRET` | Long random string (32+ characters). Required to be changed when `APP_ENV=production`. |
+| `ANTHROPIC_API_KEY` | Optional. Without it, rules-only mode. |
+| `ALLOWED_ORIGIN` | The frontend's address, for example `https://your-app.vercel.app` |
+| `APP_ENV` | `production` makes the server refuse the default secret |
 
-The local rules identify language that needs substantiation. They do not verify market position or factual truth. A reviewer must check the source, scope, date and comparison set.
+**Frontend** (`frontend/.env.local`, or Vercel environment variables)
 
-Approval is blocked while a finding is **Open** or **Accepted** (confirmed but not fixed). A finding must be edited or marked not applicable before approval. This is enforced in the review repository as well as in the UI.
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_USE_MOCK` | `true` = demo only (sample data). `false` with an API URL = the login page offers **both** a real sign-in and the demo |
+| `NEXT_PUBLIC_API_URL` | Backend address, without `/api/v1`. Must be `https://` in production. |
 
+These are baked in at build time. On Vercel, change them and redeploy.
 
-## Review workflow interaction updates
+## Tests
 
-- Full-draft editing now uses an explicit Save draft changes action; Cancel discards unsaved textarea changes. Saved edits are added to the local demo audit timeline.
-- Finding-level manual replacement starts with the flagged phrase, not the explanatory suggestion. Saving replaces that phrase in the submitted draft and marks the finding Edited.
-- Confirming a finding and marking it not applicable are labelled as distinct human classification decisions.
-- Review summary separates Open, Confirmed, Edited, and Approval blockers so the counters agree with the approval gate.
-- Approval remains human-controlled and is blocked by Open or Confirmed findings.
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest                                                    # SQLite, no setup
+TEST_DATABASE_URL=postgresql://user:pw@localhost/greenlight_test pytest   # real PostgreSQL
+```
+
+75 tests cover the contract, permissions, state transitions, the pipeline and the verifier.
+
+## Project layout
+
+```
+backend/
+  app/routers/      HTTP endpoints (auth, reviews, findings, approvals, brand_kit, insights)
+  app/pipeline/     split, rules, retrieve, judge, verify, score
+  app/services/     workflow, Brand Kit, insights, AI disclosure
+  tests/
+frontend/
+  src/lib/          api.ts (mock/live switch), mockData.ts, session.ts
+  src/features/     reviews, brand-kit, approvals, dashboard, insights, auth
+  CONNECT_BACKEND.md
+docs/API.md         the contract both sides build to
+PROJECT.md          plan, roles, version roadmap
+```
+
+## Deploying
+
+- **Frontend → Vercel.** Import the repo and set **Root Directory** to `frontend`. Works as-is in sample-data mode.
+- **Backend → Vercel** (a second project from the same repo, Root Directory `backend`). Add a Postgres database from Vercel's Storage tab (Neon supports pgvector), set `JWT_SECRET` and `ALLOWED_ORIGIN`, deploy. On first start the app creates its tables and the demo workspace by itself. Details below.
+- **Backend alternatives:** Render, Railway or Fly also work, with any PostgreSQL that supports pgvector.
+
+### Backend on Vercel
+
+1. New Project → import this repo → set **Root Directory** to `backend`. Vercel detects FastAPI from `requirements.txt` and `index.py`.
+2. Storage tab → create a Postgres database (Neon) and connect it to this project. This adds `DATABASE_URL` (or `POSTGRES_URL`) automatically.
+3. Environment variables: `JWT_SECRET` (random, 32+ characters; the app refuses to start without it) and `ALLOWED_ORIGIN` (your frontend's production URL, no trailing slash). `ANTHROPIC_API_KEY` is optional.
+4. Deploy, then open `<backend-url>/health` and `<backend-url>/docs`.
+5. In the frontend's Vercel project set `NEXT_PUBLIC_USE_MOCK=false` and `NEXT_PUBLIC_API_URL=<backend-url>`, then redeploy it.
+
+Without a database attached, the backend falls back to a temporary SQLite file that resets, which is fine for a quick look but not for sharing. Embeddings use the built-in fallback on Vercel because `sentence-transformers` is too large for a serverless bundle.
+
+## Status and known limits
+
+Working: authentication and roles, the versioned Brand Kit, the full detection pipeline, the review workflow, insights, per-review AI disclosure, and a frontend verified end to end against both the mock and the real backend.
+
+Not yet done:
+
+- Verified on PostgreSQL 16 with pgvector locally, but not yet on a live hosted Vercel/Neon deployment or against a live Claude key.
+- No labelled test set, so detection precision is unmeasured.
+- No endpoints to read a review's audit trail or its comments, to edit a draft directly, or to delete a Brand Kit source.
+- No signup or password reset. Users come from the seed script.
+- No login rate limiting or error monitoring.
+- Text only. Image and PDF checks are not built.
+
+## Embeddings note
+
+`sentence-transformers` (self-hosted, 384 dimensions) is used when installed. Otherwise a built-in hashing embedder keeps the service running at lower retrieval quality. Install it for real use. Similarity is computed in Python, which is fine for a Brand Kit of hundreds of sources.
+
+## Don't commit
+
+`.venv/`, `node_modules/`, `.next/`, `.env` and `.env.local` files, and `*.db` files. The provided `.gitignore` already covers them.
